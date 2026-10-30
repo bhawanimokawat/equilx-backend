@@ -243,6 +243,7 @@ async function refreshSession(rawRefreshToken) {
     await tx.refreshToken.create({
       data: {
         userId: session.userId,
+        familyId: session.familyId,
         tokenHash: hashToken(newRefreshToken),
         expiresAt: getRefreshExpiry(),
       },

@@ -82,5 +82,5 @@ module.exports = {
   updateMembershipSchema,
   listMembershipsQuerySchema,
   instituteIdParamSchema,
-  membershipIdParamSchema,
+  membershipRouteParamsSchema,
 };
