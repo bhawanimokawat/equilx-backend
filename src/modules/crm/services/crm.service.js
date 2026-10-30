@@ -18,6 +18,9 @@ const LEAD_SELECT = {
   createdAt: true,
   updatedAt: true,
   deletedAt: true,
+  targetBand: true,
+  examDate: true,
+  tags: true,
 };
 
 function createServiceError(message, statusCode, code) {

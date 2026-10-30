@@ -23,7 +23,7 @@ async function register(req, res, next) {
     }
 
     const { name, email, password } = validation.data;
-    const passwordHash = await bcrypt.hash(password, 12);
+    const passwordHash = await bcrypt.hash(password, 8);
 
     const user = await registerUser({ name, email, passwordHash });
 

@@ -14,6 +14,11 @@ const docsRoutes = require("./routes/docs.routes");
 const crmRoutes = require("./modules/crm/routes/crm.routes");
 const { services } = require("nodemailer/lib/well-known/services.js");
 const cmsRoutes = require("./modules/cms/routes/cms.routes");
+const attemptRoutes = require("./modules/attempts/routes/attempt.routes");
+const mockRoutes = require("./modules/mock/routes/mock.routes");
+const practiceRoutes = require("./modules/practice/routes/practice.routes");
+const resultRoutes = require("./modules/results/routes/result.routes");
+
 
 const app = express();
 
@@ -53,6 +58,11 @@ app.use("/api/v1/organizations", organizationRoutes);
 app.use("/api/v1/institutes", membershipRoutes);
 app.use("/api/v1/institutes/:instituteId/crm", crmRoutes);
 app.use("/api/v1/cms", cmsRoutes);
+app.use("/api/v1/attempts", attemptRoutes);
+app.use("/api/v1/mock", mockRoutes);
+app.use("/api/v1/practice", practiceRoutes);
+app.use("/api/v1/results", resultRoutes);
+
 
 
 // Health check.
@@ -68,4 +78,12 @@ app.use(notFoundHandler);
 app.use(errorHandler);
 
 module.exports = app;
+
+
+
+
+
+
+
+
 

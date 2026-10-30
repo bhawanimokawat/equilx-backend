@@ -9,7 +9,7 @@ const emailSchema = z
 
 const passwordSchema = z
   .string()
-  .min(12, "Password must contain at least 12 characters")
+  .min(12, "Password must contain at least 8 characters")
   .max(128, "Password must not exceed 128 characters");
 
 
