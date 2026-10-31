@@ -4,6 +4,7 @@ const { startAttemptSchema,saveAnswerSchema,attemptIdParamSchema,questionIdParam
 async function startAttempt(req, res, next) {
   try {
     const validation = startAttemptSchema.safeParse(req.body);
+    
 
     if (!validation.success) {
       return res.status(400).json({
@@ -28,10 +29,13 @@ async function startAttempt(req, res, next) {
       });
     }
 
-    const attempt = await attemptService.startAttempt({
-      userId,
-      ...validation.data,
-    });
+  const attempt = await attemptService.startAttempt({
+  userId,
+  testVersionId: validation.data.testVersionId,
+  usageType: validation.data.usageType,
+  moduleId: validation.data.moduleId,
+  partId: validation.data.partId,
+});
 
     return res.status(201).json({
       success: true,
@@ -45,10 +49,6 @@ async function startAttempt(req, res, next) {
 
 async function saveAnswer(req, res, next) {
   try {
-    const attemptValidation = attemptIdParamSchema.safeParse({
-      attemptId: req.params.attemptId,
-    });
-
     const questionValidation = questionIdParamSchema.safeParse({
       attemptId: req.params.attemptId,
       questionId: req.params.questionId,
@@ -57,9 +57,6 @@ async function saveAnswer(req, res, next) {
     const answerValidation = saveAnswerSchema.safeParse(req.body);
 
     const validationErrors = [
-      ...(!attemptValidation.success
-        ? attemptValidation.error.issues
-        : []),
       ...(!questionValidation.success
         ? questionValidation.error.issues
         : []),
@@ -92,8 +89,8 @@ async function saveAnswer(req, res, next) {
 
     const savedAnswer = await attemptService.saveAnswer({
       userId,
-      attemptId: req.params.attemptId,
-      questionId: req.params.questionId,
+      attemptId: questionValidation.data.attemptId,
+      questionId: questionValidation.data.questionId,
       answer: answerValidation.data.answer,
     });
 
@@ -106,7 +103,6 @@ async function saveAnswer(req, res, next) {
     next(error);
   }
 }
-
 
 async function getMyAttempts(req, res, next) {
   try {
@@ -316,75 +312,47 @@ async function getAttemptQuestions(req, res, next) {
 }
 
 
-async function getAttemptResult({ userId, attemptId }) {
-  if (!userId) {
-    throw createServiceError(
-      "Authentication is required.",
-      401,
-      "UNAUTHORIZED"
-    );
-  }
+async function getAttemptResult(req, res, next) {
+  try {
+    const validation = attemptIdParamSchema.safeParse({
+      attemptId: req.params.attemptId,
+    });
 
-  const attempt = await prisma.attempt.findFirst({
-    where: {
-      id: attemptId,
+    if (!validation.success) {
+      return res.status(400).json({
+        success: false,
+        code: "VALIDATION_ERROR",
+        message: "Invalid attempt ID.",
+        errors: validation.error.issues.map((issue) => ({
+          field: issue.path.join("."),
+          message: issue.message,
+        })),
+      });
+    }
+
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({
+        success: false,
+        code: "UNAUTHORIZED",
+        message: "Authentication is required.",
+      });
+    }
+
+    const result = await attemptService.getAttemptResult({
       userId,
-    },
-    select: {
-      id: true,
-      usageType: true,
-      status: true,
-      submittedAt: true,
-      mockScore: {
-        select: {
-          id: true,
-          listeningBand: true,
-          readingBand: true,
-          writingBand: true,
-          speakingBand: true,
-          overallBand: true,
-          scoreSnapshot: true,
-          completedAt: true,
-        },
-      },
-      practiceResult: {
-        select: {
-          id: true,
-          scoreSnapshot: true,
-          completedAt: true,
-        },
-      },
-    },
-  });
+      attemptId: validation.data.attemptId,
+    });
 
-  if (!attempt) {
-    throw createServiceError(
-      "Attempt not found.",
-      404,
-      "ATTEMPT_NOT_FOUND"
-    );
+    return res.status(200).json({
+      success: true,
+      message: "Attempt result retrieved successfully.",
+      data: { result },
+    });
+  } catch (error) {
+    next(error);
   }
-
-  const result =
-    attempt.usageType === "FULL_MOCK"
-      ? attempt.mockScore
-      : attempt.practiceResult;
-
-  if (!result) {
-    throw createServiceError(
-      "Result is not available yet.",
-      404,
-      "RESULT_NOT_AVAILABLE"
-    );
-  }
-
-  return {
-    attemptId: attempt.id,
-    usageType: attempt.usageType,
-    status: attempt.status,
-    submittedAt: attempt.submittedAt,
-    result,
-  };
 }
 module.exports = {
   startAttempt,

@@ -669,6 +669,8 @@ model TestModule {
   testVersion TestVersion @relation(fields: [testVersionId], references: [id], onDelete: Restrict)
   parts       TestPart[]
 
+  attempts Attempt[] @relation("AttemptModule")
+
   @@unique([testVersionId, section])
   @@unique([testVersionId, position])
   @@index([section])
@@ -687,6 +689,7 @@ model TestPart {
   testModule TestModule      @relation(fields: [testModuleId], references: [id], onDelete: Restrict)
   groups     QuestionGroup[]
   questions  Question[]
+  attempts   Attempt[]       @relation("AttemptPart")
 
   @@unique([testModuleId, position])
   @@index([testModuleId])
@@ -758,22 +761,32 @@ model BandConversionVersion {
 }
 
 model Attempt {
-  id                  String               @id @default(uuid()) @db.Uuid
-  userId              String               @db.Uuid
-  testVersionId       String               @db.Uuid
-  usageType           UsageType
-  status              AttemptStatus        @default(IN_PROGRESS)
-  startedAt           DateTime             @default(now())
-  deadlineAt          DateTime?
-  submittedAt         DateTime?
-  lastSavedAt         DateTime?
-  createdAt           DateTime             @default(now())
-  updatedAt           DateTime             @updatedAt
+  id            String @id @default(uuid()) @db.Uuid
+  userId        String @db.Uuid
+  testVersionId String @db.Uuid
+
+  // Practice scope (both NULL for FULL_MOCK)
+  moduleId String? @db.Uuid
+  partId   String? @db.Uuid
+
+  usageType   UsageType
+  status      AttemptStatus @default(IN_PROGRESS)
+  startedAt   DateTime      @default(now())
+  deadlineAt  DateTime?
+  submittedAt DateTime?
+  lastSavedAt DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
   writingSubmissions  WritingSubmission[]
   speakingSubmissions SpeakingSubmission[]
 
-  user                  User                   @relation(fields: [userId], references: [id], onDelete: Restrict)
-  testVersion           TestVersion            @relation(fields: [testVersionId], references: [id], onDelete: Restrict)
+  user        User        @relation(fields: [userId], references: [id], onDelete: Restrict)
+  testVersion TestVersion @relation(fields: [testVersionId], references: [id], onDelete: Restrict)
+
+  module TestModule? @relation("AttemptModule", fields: [moduleId], references: [id], onDelete: Restrict)
+  part   TestPart?   @relation("AttemptPart", fields: [partId], references: [id], onDelete: Restrict)
+
   answers               AttemptAnswer[]
   mockScore             MockScore?
   practiceResult        PracticeResult?
@@ -782,6 +795,8 @@ model Attempt {
   @@index([userId, status, createdAt])
   @@index([testVersionId, status])
   @@index([status, deadlineAt])
+  @@index([moduleId])
+  @@index([partId])
 }
 
 model AttemptAnswer {
