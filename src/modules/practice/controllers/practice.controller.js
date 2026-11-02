@@ -1,5 +1,5 @@
 const practiceService = require("../services/practice.service");
-const { listPracticeTestsQuerySchema, testIdParamSchema, testVersionIdParamSchema, attemptIdParamSchema,} = require("../validation/practice.validation");
+const { listPracticeTestsQuerySchema, testIdParamSchema, testVersionIdParamSchema, attemptIdParamSchema, practiceStartBodySchema, paginationQuerySchema } = require("../validation/practice.validation");
 
 function sendError(res, error) {
   return res.status(error.statusCode || 500).json({
@@ -72,9 +72,13 @@ async function startPracticeAttempt(req, res) {
       });
     }
 
+    const { moduleId, partId } = practiceStartBodySchema.parse(req.body);
+
     const result = await practiceService.startPracticeAttempt({
       userId,
       testVersionId,
+      moduleId,
+      partId,
     });
 
     return res.status(201).json({
@@ -86,7 +90,7 @@ async function startPracticeAttempt(req, res) {
     if (error.name === "ZodError") {
       return res.status(400).json({
         success: false,
-        message: "Invalid test version ID.",
+        message: "Invalid practice attempt details.",
         errors: error.issues,
       });
     }
@@ -95,9 +99,10 @@ async function startPracticeAttempt(req, res) {
   }
 }
 
+
 async function getPracticeHistory(req, res) {
   try {
-    const query = listPracticeTestsQuerySchema.parse(req.query);
+    const query = paginationQuerySchema.parse(req.query);
 
     const userId = req.user?.id;
 

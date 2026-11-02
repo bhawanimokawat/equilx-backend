@@ -72,7 +72,7 @@ const conversionTableSchema = z
         code: "custom",
         message: "Conversion ranges must cover the total question count.",
         path: ["rawScoreToBand"],
-      });
+      });  
     }
   });
 

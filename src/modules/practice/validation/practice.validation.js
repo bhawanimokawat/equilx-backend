@@ -38,10 +38,33 @@ const attemptIdParamSchema = z.object({
   attemptId: z.string().uuid("Invalid attempt ID."),
 });
 
+// Practice must target exactly one module or one part.
+const practiceStartBodySchema = z
+  .object({
+    moduleId: z.string().uuid("Invalid module ID.").optional(),
+    partId: z.string().uuid("Invalid part ID.").optional(),
+  })
+  .strict()
+  .refine(
+    (data) =>
+      (Boolean(data.moduleId) && !data.partId) ||
+      (!data.moduleId && Boolean(data.partId)),
+    {
+      message: "Provide exactly one of moduleId or partId.",
+    }
+  );
+
+
+const paginationQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(50).default(10),
+});
 module.exports = {
   listPracticeTestsQuerySchema,
   testIdParamSchema,
   testVersionIdParamSchema,
   sectionParamSchema,
   attemptIdParamSchema,
+  practiceStartBodySchema,
+  paginationQuerySchema,
 };

@@ -1,4 +1,7 @@
 const { prisma } = require("../../../config/database");
+const {
+  saveObjectiveSectionScore,
+} = require("../../results/services/score-persistence.service");
 
 function createServiceError(message, statusCode, code) {
   const error = new Error(message);
@@ -219,7 +222,7 @@ async function startAttempt({
   return attempt;
 }
 
-const now = new Date();
+
 
 async function saveAnswer({
   userId,
@@ -468,142 +471,202 @@ async function getAttemptById({ userId, attemptId }) {
 
 
 async function submitAttempt({ userId, attemptId }) {
-  if (!userId) {
-    throw createServiceError(
-      "Authentication is required.",
-      401,
-      "UNAUTHORIZED"
-    );
-  }
-
-  const now = new Date();
-
-  return prisma.$transaction(
-    async (tx) => {
-      // 1. Verify attempt ownership and status.
-      const attempt = await tx.attempt.findFirst({
-        where: {
-          id: attemptId,
-          userId,
-        },
-        select: {
-          id: true,
-          testVersionId: true,
-          usageType: true,
-          moduleId: true,
-          partId: true,
-          status: true,
-          deadlineAt: true,
-        },
-      });
-
-      if (!attempt) {
+    if (!userId) {
         throw createServiceError(
-          "Attempt not found.",
-          404,
-          "ATTEMPT_NOT_FOUND"
+            "Authentication is required.",
+            401,
+            "UNAUTHORIZED"
         );
-      }
-
-      if (attempt.status !== "IN_PROGRESS") {
-        throw createServiceError(
-          "This attempt has already been submitted or is no longer active.",
-          400,
-          "ATTEMPT_NOT_IN_PROGRESS"
-        );
-      }
-
-      // 2. Determine submission type.
-      const isDeadlinePassed =
-        attempt.deadlineAt && now >= attempt.deadlineAt;
-
-      const finalStatus = isDeadlinePassed
-        ? "AUTO_SUBMITTED"
-        : "SUBMITTED";
-
-      // 3. Update only if the attempt is still active.
-      const updateResult = await tx.attempt.updateMany({
-        where: {
-          id: attemptId,
-          userId,
-          status: "IN_PROGRESS",
-          OR: [
-            { deadlineAt: null },
-            { deadlineAt: { gt: now } },
-            ...(isDeadlinePassed
-              ? [{ deadlineAt: { lte: now } }]
-              : []),
-          ],
-        },
-        data: {
-          status: finalStatus,
-          submittedAt: now,
-        },
-      });
-
-      if (updateResult.count !== 1) {
-        throw createServiceError(
-          "This attempt has already been submitted or is no longer active.",
-          400,
-          "ATTEMPT_NOT_IN_PROGRESS"
-        );
-      }
-
-      // 4. Calculate existing objective scores for FULL_MOCK.
-      if (attempt.usageType === "FULL_MOCK") {
-        await saveObjectiveSectionScore({
-          attemptId,
-          section: "LISTENING",
-          db: tx,
-        });
-
-        await saveObjectiveSectionScore({
-          attemptId,
-          section: "READING",
-          db: tx,
-        });
-      }
-
-      // 5. Retrieve final attempt details.
-      const submittedAttempt = await tx.attempt.findFirst({
-        where: {
-          id: attemptId,
-          userId,
-        },
-        select: {
-          id: true,
-          testVersionId: true,
-          usageType: true,
-          moduleId: true,
-          partId: true,
-          status: true,
-          startedAt: true,
-          submittedAt: true,
-          deadlineAt: true,
-        },
-      });
-
-      // 6. Return submission information.
-      return {
-        ...submittedAttempt,
-
-        scoring:
-          attempt.usageType === "FULL_MOCK"
-            ? {
-              listening: "COMPLETED",
-              reading: "COMPLETED",
-              writing: "PENDING",
-              speaking: "PENDING",
-            }
-            : {
-              practice: "PENDING",
-            },
-      };
-    },
-    {
-      isolationLevel: "Serializable",
     }
-  );
+
+    const now = new Date();
+
+    return prisma.$transaction(
+        async (tx) => {
+            // 1. Verify attempt ownership and status.
+            const attempt = await tx.attempt.findFirst({
+                where: {
+                    id: attemptId,
+                    userId,
+                },
+                select: {
+                    id: true,
+                    testVersionId: true,
+                    usageType: true,
+                    moduleId: true,
+                    partId: true,
+                    status: true,
+                    deadlineAt: true,
+                },
+            });
+
+            if (!attempt) {
+                throw createServiceError(
+                    "Attempt not found.",
+                    404,
+                    "ATTEMPT_NOT_FOUND"
+                );
+            }
+
+            if (attempt.status !== "IN_PROGRESS") {
+                throw createServiceError(
+                    "This attempt has already been submitted or is no longer active.",
+                    400,
+                    "ATTEMPT_NOT_IN_PROGRESS"
+                );
+            }
+
+            // 2. Determine submission type.
+            const isDeadlinePassed =
+                attempt.deadlineAt && now >= attempt.deadlineAt;
+
+            const finalStatus = isDeadlinePassed
+                ? "AUTO_SUBMITTED"
+                : "SUBMITTED";
+
+            // 3. Update only if the attempt is still active.
+            const updateResult = await tx.attempt.updateMany({
+                where: {
+                    id: attemptId,
+                    userId,
+                    status: "IN_PROGRESS",
+                    OR: [
+                        { deadlineAt: null },
+                        { deadlineAt: { gt: now } },
+                        ...(isDeadlinePassed
+                            ? [{ deadlineAt: { lte: now } }]
+                            : []),
+                    ],
+                },
+                data: {
+                    status: finalStatus,
+                    submittedAt: now,
+                },
+            });
+
+            if (updateResult.count !== 1) {
+                throw createServiceError(
+                    "This attempt has already been submitted or is no longer active.",
+                    400,
+                    "ATTEMPT_NOT_IN_PROGRESS"
+                );
+            }
+
+            // 4. Calculate scores according to attempt type.
+            let scoring;
+
+            if (attempt.usageType === "FULL_MOCK") {
+                await saveObjectiveSectionScore({
+                    attemptId,
+                    section: "LISTENING",
+                    db: tx,
+                });
+
+                await saveObjectiveSectionScore({
+                    attemptId,
+                    section: "READING",
+                    db: tx,
+                });
+
+                scoring = {
+                    listening: "COMPLETED",
+                    reading: "COMPLETED",
+                    writing: "PENDING",
+                    speaking: "PENDING",
+                };
+            } else if (attempt.usageType === "PRACTICE") {
+                let practiceSection;
+
+                if (attempt.partId) {
+                    const part = await tx.testPart.findUnique({
+                        where: {
+                            id: attempt.partId,
+                        },
+                        select: {
+                            testModule: {
+                                select: {
+                                    section: true,
+                                },
+                            },
+                        },
+                    });
+
+                    practiceSection = part?.testModule?.section;
+                } else if (attempt.moduleId) {
+                    const module = await tx.testModule.findUnique({
+                        where: {
+                            id: attempt.moduleId,
+                        },
+                        select: {
+                            section: true,
+                        },
+                    });
+
+                    practiceSection = module?.section;
+                }
+
+                if (!practiceSection) {
+                    throw createServiceError(
+                        "Practice section could not be identified.",
+                        400,
+                        "INVALID_PRACTICE_SCOPE"
+                    );
+                }
+
+                if (
+                    ["LISTENING", "READING"].includes(practiceSection)
+                ) {
+                    await saveObjectiveSectionScore({
+                        attemptId,
+                        section: practiceSection,
+                        db: tx,
+                    });
+
+                    scoring = {
+                        practice: "COMPLETED",
+                    };
+                } else {
+                    scoring = {
+                        practice: "PENDING",
+                    };
+                }
+            } else {
+                throw createServiceError(
+                    "Unsupported attempt usage type.",
+                    400,
+                    "INVALID_USAGE_TYPE"
+                );
+            }
+
+            // 5. Retrieve final attempt details.
+            const submittedAttempt = await tx.attempt.findFirst({
+                where: {
+                    id: attemptId,
+                    userId,
+                },
+                select: {
+                    id: true,
+                    testVersionId: true,
+                    usageType: true,
+                    moduleId: true,
+                    partId: true,
+                    status: true,
+                    startedAt: true,
+                    submittedAt: true,
+                    deadlineAt: true,
+                },
+            });
+
+            // 6. Return submission information.
+            return {
+                ...submittedAttempt,
+                scoring,
+            };
+        },
+        {
+            isolationLevel: "Serializable",
+        }
+    );
 }
 
 async function getAttemptAnswers({ userId, attemptId }) {

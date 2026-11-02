@@ -214,9 +214,10 @@ async function getMockHistory({ userId, page = 1, limit = 10 }) {
   const [attempts, total] = await prisma.$transaction([
     prisma.attempt.findMany({
       where,
-      orderBy: {
-        startedAt: "desc",
-      },
+      orderBy: [
+        { startedAt: "desc" },
+        { id: "desc" },
+      ],
       skip: (page - 1) * limit,
       take: limit,
       select: {
@@ -314,10 +315,14 @@ async function getMockHistoryItem({ userId, attemptId }) {
         },
       },
       answers: {
+        orderBy: {
+          lastSavedAt: "asc",
+        },
         select: {
           questionId: true,
           answer: true,
-          savedAt: true,
+          firstSavedAt: true,
+          lastSavedAt: true,
         },
       },
       mockScore: {

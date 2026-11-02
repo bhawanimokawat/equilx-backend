@@ -1,5 +1,5 @@
 const { prisma } = require("../../../config/database");
-const { startAttempt,} = require("../../attempts/services/attempt.service");
+const { startAttempt, } = require("../../attempts/services/attempt.service");
 
 async function listPracticeTests({
   page = 1,
@@ -17,12 +17,12 @@ async function listPracticeTests({
         status: "PUBLISHED",
         ...(section
           ? {
-              modules: {
-                some: {
-                  section,
-                },
+            modules: {
+              some: {
+                section,
               },
-            }
+            },
+          }
           : {}),
       },
     },
@@ -55,12 +55,12 @@ async function listPracticeTests({
             status: "PUBLISHED",
             ...(section
               ? {
-                  modules: {
-                    some: {
-                      section,
-                    },
+                modules: {
+                  some: {
+                    section,
                   },
-                }
+                },
+              }
               : {}),
           },
           orderBy: {
@@ -232,11 +232,18 @@ async function getPracticeTestDetails(testId) {
   };
 }
 
-async function startPracticeAttempt({ userId, testVersionId }) {
+async function startPracticeAttempt({
+  userId,
+  testVersionId,
+  moduleId,
+  partId,
+}) {
   return startAttempt({
     userId,
     testVersionId,
     usageType: "PRACTICE",
+    moduleId,
+    partId,
   });
 }
 
@@ -249,14 +256,17 @@ async function getPracticeHistory({ userId, page = 1, limit = 10 }) {
   const [attempts, total] = await prisma.$transaction([
     prisma.attempt.findMany({
       where,
-      orderBy: {
-        startedAt: "desc",
-      },
+      orderBy: [
+        { startedAt: "desc" },
+        { id: "desc" },
+      ],
       skip: (page - 1) * limit,
       take: limit,
       select: {
         id: true,
         status: true,
+        moduleId: true,
+        partId: true,
         startedAt: true,
         deadlineAt: true,
         submittedAt: true,
@@ -347,10 +357,14 @@ async function getPracticeHistoryItem({ userId, attemptId }) {
         },
       },
       answers: {
+        orderBy: {
+          lastSavedAt: "asc",
+        },
         select: {
           questionId: true,
           answer: true,
-          savedAt: true,
+          firstSavedAt: true,
+          lastSavedAt: true,
         },
       },
       practiceResult: {
