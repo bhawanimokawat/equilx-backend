@@ -12,13 +12,16 @@ const organizationRoutes = require("./modules/organizations/routes/organization.
 const membershipRoutes = require("./modules/memberships/routes/membership.routes")
 const docsRoutes = require("./routes/docs.routes");
 const crmRoutes = require("./modules/crm/routes/crm.routes");
-const { services } = require("nodemailer/lib/well-known/services.js");
 const cmsRoutes = require("./modules/cms/routes/cms.routes");
 const attemptRoutes = require("./modules/attempts/routes/attempt.routes");
 const mockRoutes = require("./modules/mock/routes/mock.routes");
 const practiceRoutes = require("./modules/practice/routes/practice.routes");
 const resultRoutes = require("./modules/results/routes/result.routes");
-
+const paymentRoutes =  require("./modules/payments/routes/payment.routes");
+const paymentController = require("./modules/payments/controllers/payment.controller");
+const subscriptionRoutes = require("./modules/subscriptions/routes/subscription.routes");
+const planRoutes = require("./modules/plans/routes/plan.routes");
+const invoiceRoutes = require("./modules/invoices/routes/invoice.routes");
 
 const app = express();
 
@@ -45,6 +48,17 @@ app.use(
 // Apply general API rate limiting once.
 app.use("/api", apiLimiter);
 
+// Razorpay webhook: preserve the original request body for signature verification.
+app.post(
+  "/api/v1/payments/webhook",
+  express.raw({
+    type: "application/json",
+    limit: "100kb",
+  }),
+  paymentController.handleWebhook
+);
+
+
 // Parse requests before mounting routes.
 app.use(express.json({ limit: "100kb" }));
 app.use(express.urlencoded({ extended: false, limit: "20kb" }));
@@ -62,6 +76,10 @@ app.use("/api/v1/attempts", attemptRoutes);
 app.use("/api/v1/mock", mockRoutes);
 app.use("/api/v1/practice", practiceRoutes);
 app.use("/api/v1/results", resultRoutes);
+app.use("/api/v1/payments",paymentRoutes);
+app.use("/api/v1/subscriptions", subscriptionRoutes);
+app.use("/api/v1/plans", planRoutes);
+app.use("/api/v1/invoices", invoiceRoutes);
 
 
 
