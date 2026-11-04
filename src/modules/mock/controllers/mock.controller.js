@@ -1,5 +1,5 @@
 const mockService = require("../services/mock.service");
-const { listMockTestsQuerySchema,  testIdParamSchema,  testVersionIdParamSchema, attemptIdParamSchema,} = require("../validations/mock.validation");
+const { listMockTestsQuerySchema,  testIdParamSchema,  testVersionIdParamSchema, attemptIdParamSchema, mockHistoryQuerySchema} = require("../validations/mock.validation");
 
 function sendError(res, error) {
   return res.status(error.statusCode || 500).json({
@@ -95,7 +95,7 @@ async function startMockAttempt(req, res) {
 
 async function getMockHistory(req, res) {
   try {
-    const query = listMockTestsQuerySchema.parse(req.query);
+    const query = mockHistoryQuerySchema.parse(req.query);
 
     const userId = req.user?.id;
 

@@ -57,9 +57,10 @@ async function listMyResults({
   const [attempts, total] = await prisma.$transaction([
     prisma.attempt.findMany({
       where,
-      orderBy: {
-        submittedAt: "desc",
-      },
+      orderBy: [
+        { submittedAt: "desc" },
+        { id: "desc" },
+      ],
       skip,
       take: limit,
       select: {

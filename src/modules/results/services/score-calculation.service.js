@@ -94,6 +94,9 @@ async function calculateObjectiveSectionScore({
         select: {
             id: true,
             status: true,
+            usageType: true,
+            moduleId: true,
+            partId: true,
             testVersionId: true,
             answers: {
                 select: {
@@ -112,27 +115,43 @@ async function calculateObjectiveSectionScore({
         throw new Error("Attempt must be submitted before scoring.");
     }
 
-    const questions = await db.question.findMany({
-        where: {
-            testPart: {
-                testModule: {
-                    testVersionId: attempt.testVersionId,
-                    section,
-                },
-            },
+    const questionWhere = {
+    testPart: {
+        testModule: {
+            testVersionId: attempt.testVersionId,
+            section,
         },
-        select: {
-            id: true,
-            marks: true,
-            answerKey: {
-                select: {
-                    acceptedAnswers: true,
-                    markingRules: true,
-                },
-            },
-        },
-    });
+    },
+};
 
+// For Practice, score only the selected module or part.
+if (attempt.usageType === "PRACTICE") {
+    if (!attempt.moduleId && !attempt.partId) {
+        throw new Error("Practice attempt scope is missing.");
+    }
+
+    if (attempt.partId) {
+        questionWhere.testPartId = attempt.partId;
+    } else {
+        questionWhere.testPart = {
+            testModuleId: attempt.moduleId,
+        };
+    }
+}
+
+const questions = await db.question.findMany({
+    where: questionWhere,
+    select: {
+        id: true,
+        marks: true,
+        answerKey: {
+            select: {
+                acceptedAnswers: true,
+                markingRules: true,
+            },
+        },
+    },
+});
     if (questions.length === 0) {
         throw new Error(`No ${section} questions found for this test.`);
     }
@@ -206,6 +225,9 @@ async function calculateSectionBand({
             id: true,
             testVersionId: true,
             status: true,
+            usageType: true,
+            moduleId: true,
+            partId: true,
             testVersion: {
                 select: {
                     test: {

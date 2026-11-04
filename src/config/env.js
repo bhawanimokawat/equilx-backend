@@ -32,7 +32,7 @@ const envSchema = z.object({
     32,
     "OTP_HASH_SECRET must contain at least 32 characters"
   ),
-  
+
   ACCESS_TOKEN_SECRET: z.string().min(
     32,
     "ACCESS_TOKEN_SECRET must contain at least 32 characters"
@@ -47,6 +47,19 @@ const envSchema = z.object({
     .max(30)
     .default(7),
 
+  // Razorpay payment configuration
+  RAZORPAY_KEY_ID: z
+    .string()
+    .min(1, "RAZORPAY_KEY_ID is required"),
+
+  RAZORPAY_KEY_SECRET: z
+    .string()
+    .min(1, "RAZORPAY_KEY_SECRET is required"),
+
+  RAZORPAY_WEBHOOK_SECRET: z.preprocess(
+    (value) => (value === "" ? undefined : value),
+    z.string().min(1).optional()
+  ),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -64,3 +77,4 @@ if (!parsed.success) {
 }
 
 module.exports = parsed.data;
+
