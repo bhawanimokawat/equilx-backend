@@ -104,6 +104,7 @@ model User {
 
   createdBatches   Batch[]       @relation("BatchCreator")
   batchMemberships BatchMember[]
+  batchesAssigned  Batch[]       @relation("BatchTrainer")
 
   trainerAssignments    TrainerStudent[] @relation("TrainerAssignmentTrainer")
   studentAssignments    TrainerStudent[] @relation("TrainerAssignmentStudent")
@@ -290,16 +291,21 @@ model Batch {
   instituteId String   @db.Uuid
   name        String
   createdById String   @db.Uuid
+  trainerId   String?  @db.Uuid
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   institute         Institute               @relation(fields: [instituteId], references: [id], onDelete: Restrict)
   createdBy         User                    @relation("BatchCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  trainer           User?                   @relation("BatchTrainer", fields: [trainerId], references: [id], onDelete: Restrict)
   members           BatchMember[]
   assignmentTargets AssignmentBatchTarget[]
 
+  conversations Conversation[]
+
   @@unique([instituteId, name])
   @@index([instituteId, createdAt])
+  @@index([trainerId])
 }
 
 model BatchMember {
@@ -1311,6 +1317,7 @@ enum DeliveryStatus {
 model Conversation {
   id          String             @id @default(uuid()) @db.Uuid
   instituteId String             @db.Uuid
+  batchId     String?            @db.Uuid
   type        ConversationType
   status      ConversationStatus @default(ACTIVE)
   title       String?
@@ -1319,10 +1326,12 @@ model Conversation {
   updatedAt   DateTime           @updatedAt
 
   institute    Institute                 @relation(fields: [instituteId], references: [id], onDelete: Restrict)
+  batch        Batch?                    @relation(fields: [batchId], references: [id], onDelete: Restrict)
   participants ConversationParticipant[]
   messages     Message[]
 
   @@index([instituteId, status, updatedAt])
+  @@index([batchId])
 }
 
 model ConversationParticipant {
