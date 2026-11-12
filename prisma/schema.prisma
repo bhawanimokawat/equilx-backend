@@ -952,8 +952,8 @@ model WritingSubmission {
   attempt     Attempt             @relation(fields: [attemptId], references: [id], onDelete: Restrict)
   evaluations WritingEvaluation[]
 
+  @@unique([attemptId, taskNumber])
   @@index([userId, submittedAt])
-  @@index([attemptId, taskNumber])
 }
 
 model WritingEvaluation {
@@ -1032,6 +1032,7 @@ model SpeakingRecording {
   mimeType        String
   durationSeconds Int?
   fileSizeBytes   BigInt?
+  checksum        String?
   consentStatus   RecordingConsentStatus
   recordedAt      DateTime?
   deleteAfter     DateTime?
@@ -1041,6 +1042,7 @@ model SpeakingRecording {
   submission SpeakingSubmission @relation(fields: [submissionId], references: [id], onDelete: Restrict)
 
   @@index([submissionId, createdAt])
+  @@index([submissionId, checksum, deletedAt])
   @@index([deleteAfter, deletedAt])
 }
 

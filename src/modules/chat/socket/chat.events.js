@@ -29,6 +29,9 @@ const CHAT_EVENTS = Object.freeze({
 
   // Errors
   ERROR: "chat:error",
+
+
+  PRESENCE_SNAPSHOT: "presence:snapshot",
 });
 
 module.exports = { CHAT_EVENTS };

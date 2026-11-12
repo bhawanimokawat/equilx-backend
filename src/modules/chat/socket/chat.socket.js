@@ -1,8 +1,13 @@
 
 const { CHAT_EVENTS } = require("./chat.events");
-const {authorizeConversationRoom,} = require("./chat.authorization");
+const { authorizeConversationRoom, } = require("./chat.authorization");
 const messageService = require("../services/message.service");
-const { sendMessageSchema ,editMessageSchema} = require("../validations/chat.validation");
+const { sendMessageSchema, editMessageSchema, deleteMessageSchema, markConversationReadSchema } = require("../validations/chat.validation");
+const presenceService = require("../services/presence.service");
+const {
+  broadcastUserPresence,
+  sendConversationPresence,
+} = require("./presence.broadcast");
 
 // UUID validation
 const UUID_REGEX =
@@ -35,8 +40,39 @@ function registerChatSocketHandlers(io) {
   io.on(CHAT_EVENTS.CONNECTION, (socket) => {
     const userId = socket.data.user.id;
 
-    console.info(`[CHAT] User connected: ${userId}`);
 
+    // Register this socket as an active connection.
+    // Register socket and join the user's private room.
+    const presenceReady = (async () => {
+      const count = await presenceService.addSocket(userId, socket.id);
+
+      await socket.join(`user:${userId}`);
+
+      // Notify conversation participants only on the first connection.
+      if (count === 1) {
+        await broadcastUserPresence(io, userId, true);
+      }
+
+      return count;
+    })().catch((error) => {
+      console.error("[CHAT] Presence registration failed:", error);
+      return null;
+    });
+
+    // Refresh presence every 30 seconds.
+    const presenceInterval = setInterval(async () => {
+      try {
+        const registered = await presenceReady;
+
+        if (registered !== null) {
+          await presenceService.refreshSocket(userId, socket.id);
+        }
+      } catch (error) {
+        console.error("[CHAT] Presence refresh failed:", error);
+      }
+    }, 30000);
+
+    presenceInterval.unref?.();
     // Join conversation room
     socket.on(CHAT_EVENTS.JOIN_CONVERSATION, async (payload = {}, ack) => {
       try {
@@ -66,6 +102,9 @@ function registerChatSocketHandlers(io) {
         );
 
         await socket.join(room);
+
+        // Send the current online status of other participants.
+        await sendConversationPresence(io, socket, conversation);
 
         const response = {
           success: true,
@@ -134,8 +173,8 @@ function registerChatSocketHandlers(io) {
       }
     });
 
-    
-// Send a real-time message
+
+    // Send a real-time message
 socket.on(CHAT_EVENTS.SEND_MESSAGE, async (payload = {}, ack) => {
   try {
     const validation = sendMessageSchema.safeParse({
@@ -161,7 +200,7 @@ socket.on(CHAT_EVENTS.SEND_MESSAGE, async (payload = {}, ack) => {
     const { content, clientMessageId } = validation.data.body;
 
     // Save message using existing service
-    const message = await messageService.sendMessage({
+    const result = await messageService.sendMessage({
       userId,
       instituteId,
       conversationId,
@@ -171,7 +210,7 @@ socket.on(CHAT_EVENTS.SEND_MESSAGE, async (payload = {}, ack) => {
 
     // Convert BigInt values before Socket.IO serialization
     const safeMessage = JSON.parse(
-      JSON.stringify(message, (key, value) =>
+      JSON.stringify(result.message, (key, value) =>
         typeof value === "bigint" ? value.toString() : value
       )
     );
@@ -181,8 +220,42 @@ socket.on(CHAT_EVENTS.SEND_MESSAGE, async (payload = {}, ack) => {
       conversationId
     );
 
+    // Broadcast only when the message is newly created
+    if (result.isNew) {
+      socket.to(room).emit(CHAT_EVENTS.NEW_MESSAGE, {
+        success: true,
+        data: safeMessage,
+      });
+    }
 
-    
+    // Confirm saved message to sender
+    const response = {
+      success: true,
+      message: "Message sent successfully.",
+      data: safeMessage,
+    };
+
+    if (typeof ack === "function") {
+      return ack(response);
+    }
+
+    // Notify sender only for a newly created message
+    if (result.isNew) {
+      socket.emit(CHAT_EVENTS.NEW_MESSAGE, response);
+    }
+
+  } catch (error) {
+    console.error("[CHAT] Send message failed:", error);
+
+    sendSocketError(
+      socket,
+      "Unable to send message.",
+      ack
+    );
+  }
+});
+
+
     // Edit an existing message in real time
     socket.on(CHAT_EVENTS.EDIT_MESSAGE, async (payload = {}, ack) => {
       try {
@@ -263,45 +336,250 @@ socket.on(CHAT_EVENTS.SEND_MESSAGE, async (payload = {}, ack) => {
       }
     });
 
+    // Delete an existing message in real time
+    socket.on(CHAT_EVENTS.DELETE_MESSAGE, async (payload = {}, ack) => {
+      try {
+        const validation = deleteMessageSchema.safeParse({
+          params: {
+            instituteId: payload.instituteId,
+            conversationId: payload.conversationId,
+            messageId: payload.messageId,
+          },
+        });
 
-    // Send message to other conversation participants
-    socket.to(room).emit(CHAT_EVENTS.NEW_MESSAGE, {
-      success: true,
-      data: safeMessage,
+        if (!validation.success) {
+          return sendSocketError(
+            socket,
+            "Invalid message deletion data.",
+            ack
+          );
+        }
+
+        const {
+          instituteId,
+          conversationId,
+          messageId,
+        } = validation.data.params;
+
+        // Delete using the existing service
+        const deletedMessage = await messageService.deleteMessage({
+          userId,
+          instituteId,
+          conversationId,
+          messageId,
+        });
+
+        const room = getConversationRoom(
+          instituteId,
+          conversationId
+        );
+
+        const response = {
+          success: true,
+          message: "Message deleted successfully.",
+          data: deletedMessage,
+        };
+
+        // Notify other conversation participants
+        socket.to(room).emit(CHAT_EVENTS.MESSAGE_DELETED, response);
+
+        // Confirm deletion to sender
+        if (typeof ack === "function") {
+          return ack(response);
+        }
+
+        socket.emit(CHAT_EVENTS.MESSAGE_DELETED, response);
+
+      } catch (error) {
+        console.error("[CHAT] Delete message failed:", error);
+
+        sendSocketError(
+          socket,
+          "Unable to delete message.",
+          ack
+        );
+      }
     });
 
-    // Confirm saved message to sender
-    const response = {
-      success: true,
-      message: "Message sent successfully.",
-      data: safeMessage,
-    };
 
-    if (typeof ack === "function") {
-      return ack(response);
+
+    // Mark conversation messages as read in real time
+    socket.on(CHAT_EVENTS.MARK_READ, async (payload = {}, ack) => {
+      try {
+        const validation = markConversationReadSchema.safeParse({
+          params: {
+            instituteId: payload.instituteId,
+            conversationId: payload.conversationId,
+          },
+          body: {
+            lastMessageId: payload.lastMessageId,
+          },
+        });
+
+        if (!validation.success) {
+          return sendSocketError(
+            socket,
+            "Invalid read receipt data.",
+            ack
+          );
+        }
+
+        const { instituteId, conversationId } =
+          validation.data.params;
+
+        const { lastMessageId } = validation.data.body;
+
+        // Update read status in PostgreSQL
+        const readReceipt = await messageService.markConversationRead({
+          userId,
+          instituteId,
+          conversationId,
+          lastMessageId,
+        });
+
+        const response = {
+          success: true,
+          message: "Messages marked as read.",
+          data: {
+            conversationId: readReceipt.conversationId,
+            userId: readReceipt.userId,
+            lastReadAt: readReceipt.lastReadAt,
+          },
+        };
+
+        const room = getConversationRoom(
+          instituteId,
+          conversationId
+        );
+
+        // Notify other conversation participants
+        socket.to(room).emit(CHAT_EVENTS.READ_UPDATE, response);
+
+        // Confirm to the current participant
+        if (typeof ack === "function") {
+          return ack(response);
+        }
+
+        socket.emit(CHAT_EVENTS.READ_UPDATE, response);
+
+      } catch (error) {
+        console.error("[CHAT] Mark read failed:", error);
+
+        sendSocketError(
+          socket,
+          "Unable to mark messages as read.",
+          ack
+        );
+      }
+    });
+
+
+    // Handle typing start and stop events
+    async function handleTypingEvent(payload, eventName, ack) {
+      try {
+        const { instituteId, conversationId } = payload || {};
+
+        if (
+          !isValidUUID(instituteId) ||
+          !isValidUUID(conversationId)
+        ) {
+          return sendSocketError(
+            socket,
+            "Invalid conversation details.",
+            ack
+          );
+        }
+
+        // Verify conversation access before broadcasting
+        const conversation = await authorizeConversationRoom({
+          userId,
+          instituteId,
+          conversationId,
+        });
+
+        const room = getConversationRoom(
+          conversation.instituteId,
+          conversation.id
+        );
+
+        const response = {
+          success: true,
+          data: {
+            conversationId: conversation.id,
+            userId,
+          },
+        };
+
+        // Notify other participants
+        socket.to(room).emit(eventName, response);
+
+        if (typeof ack === "function") {
+          return ack(response);
+        }
+      } catch (error) {
+        console.error("[CHAT] Typing event failed:", error);
+
+        sendSocketError(
+          socket,
+          "Unable to process typing event.",
+          ack
+        );
+      }
     }
 
-    socket.emit(CHAT_EVENTS.NEW_MESSAGE, response);
-
-  } catch (error) {
-    console.error("[CHAT] Send message failed:", error);
-
-    sendSocketError(
-      socket,
-      "Unable to send message.",
-      ack
-    );
-  }
-});
-
-
-    // Handle disconnection
-    socket.on(CHAT_EVENTS.DISCONNECT, (reason) => {
-      console.info(
-        `[CHAT] User disconnected: ${userId}, reason: ${reason}`
+    // User started typing
+    socket.on(CHAT_EVENTS.TYPING_START, (payload = {}, ack) => {
+      return handleTypingEvent(
+        payload,
+        CHAT_EVENTS.TYPING_START,
+        ack
       );
     });
+
+    // User stopped typing
+    socket.on(CHAT_EVENTS.TYPING_STOP, (payload = {}, ack) => {
+      return handleTypingEvent(
+        payload,
+        CHAT_EVENTS.TYPING_STOP,
+        ack
+      );
+    });
+
+
+
+    // Handle disconnection.
+    socket.on(CHAT_EVENTS.DISCONNECT, async (reason) => {
+      clearInterval(presenceInterval);
+
+      try {
+        const registered = await presenceReady;
+
+        if (registered === null) {
+          return;
+        }
+
+        const remainingSockets = await presenceService.removeSocket(
+          userId,
+          socket.id
+        );
+
+        // Notify participants only when the last socket disconnects.
+        if (remainingSockets === 0) {
+          await broadcastUserPresence(io, userId, false);
+        }
+
+        console.info(
+          `[CHAT] User disconnected: ${userId}, reason: ${reason}`
+        );
+      } catch (error) {
+        console.error("[CHAT] Presence cleanup failed:", error);
+      }
+    });
+
+
   });
 }
+
+
 
 module.exports = { registerChatSocketHandlers };

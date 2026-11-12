@@ -6,24 +6,31 @@
   "scripts": {
     "test": "node --test",
     "dev": "nodemon src/server.js",
-    "start": "node src/server.js"
+    "start": "node src/server.js",
+    "test:ai": "node --test tests/ai/gemini.provider.test.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@google/genai": "^3.1.0",
     "@prisma/client": "^6.19.3",
     "@socket.io/redis-adapter": "^8.3.0",
     "bcryptjs": "^3.0.3",
+    "bullmq": "^6.7.3",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
     "csv-parse": "^7.0.3",
     "dotenv": "^18.0.9",
     "express": "^5.3.0",
     "express-rate-limit": "^8.7.1",
+    "google-auth-library": "^11.3.4",
     "helmet": "^8.3.0",
+    "ioredis": "^6.0.0",
     "jsonwebtoken": "^9.0.3",
+    "multer": "^2.5.0",
     "nodemailer": "^10.2.1",
+    "openai": "^7.55.0",
     "pdfkit": "^0.20.2",
     "pino": "^10.4.0",
     "pino-http": "^11.0.0",
@@ -39,6 +46,7 @@
     "nodemon": "^3.1.14",
     "pino-pretty": "^13.2.0",
     "prisma": "^6.19.3",
+    "socket.io-client": "^4.8.4",
     "supertest": "^7.3.1"
   },
   "overrides": {

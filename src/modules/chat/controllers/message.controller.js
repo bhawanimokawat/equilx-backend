@@ -103,7 +103,7 @@ async function sendMessage(req, res, next) {
     return res.status(201).json({
       success: true,
       message: "Message sent successfully.",
-      data: result,
+      data: result.message,
     });
   } catch (error) {
     next(error);

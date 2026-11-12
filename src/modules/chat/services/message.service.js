@@ -380,10 +380,13 @@ async function sendMessage({
         );
       }
 
-      return existingMessage;
+      return {
+        message: existingMessage,
+        isNew: false,
+      };
     }
 
-    return tx.message.create({
+    const message = await tx.message.create({
       data: {
         conversationId,
         senderId: userId,
@@ -405,9 +408,13 @@ async function sendMessage({
         attachments: true,
       },
     });
+
+    return {
+      message,
+      isNew: true,
+    };
   });
 }
-
 
 
 module.exports = {

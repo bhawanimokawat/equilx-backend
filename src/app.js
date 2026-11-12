@@ -25,6 +25,8 @@ const invoiceRoutes = require("./modules/invoices/routes/invoice.routes");
 const assignmentRoutes = require("./modules/assignments/routes/assignment.routes");
 const batchRoutes = require("./modules/batches/routes/batch.routes");
 const chatRoutes = require("./modules/chat/routes/chat.routes");
+const writingRoutes = require("./modules/writing/routes/writing.routes");
+const speakingRoutes = require("./modules/speaking/routes/speaking.routes");
 
 const app = express();
 
@@ -86,7 +88,8 @@ app.use("/api/v1/invoices", invoiceRoutes);
 app.use("/api/v1", assignmentRoutes);
 app.use("/api/v1", batchRoutes);
 app.use("/api/v1", chatRoutes);
-
+app.use("/api/v1/writing",writingRoutes);
+app.use("/api/v1/speaking",speakingRoutes);
 
 // Health check.
 app.get("/api/v1/health", (req, res) => {

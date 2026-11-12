@@ -10,6 +10,35 @@ const envSchema = z.object({
 
   PORT: z.coerce.number().int().min(1).max(65535).default(5000),
 
+  // AI configuration
+  AI_PROVIDER: z
+    .enum(["gemini", "openai"])
+    .default("gemini"),
+
+  REDIS_URL: z
+    .string()
+    .url()
+    .default("redis://127.0.0.1:6379"),
+
+  GEMINI_API_KEY: z
+    .string()
+    .min(1, "GEMINI_API_KEY is required"),
+
+  GEMINI_MODEL: z
+    .string()
+    .min(1)
+    .default("gemini-3.8-flash"),
+
+    GEMINI_TRANSCRIPTION_MODEL: z
+  .string()
+  .min(1)
+  .default("gemini-3.5-transcribe"),
+
+  GEMINI_SPEAKING_MODEL: z
+  .string()
+  .min(1)
+  .default("gemini-3.8-flash"),
+
   FRONTEND_URL: z.string().min(1).default("http://localhost:5173"),
 
   DATABASE_URL: z
@@ -77,4 +106,3 @@ if (!parsed.success) {
 }
 
 module.exports = parsed.data;
-

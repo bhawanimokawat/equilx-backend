@@ -87,6 +87,28 @@ async function authorizeConversationRoom({
     throw new Error("You do not have access to this institute.");
   }
 
+ const debugConversation = await prisma.conversation.findUnique({
+  where: { id: conversationId },
+  select: {
+    id: true,
+    instituteId: true,
+    status: true,
+    participants: {
+      select: {
+        userId: true,
+        leftAt: true,
+      },
+    },
+  },
+});
+
+console.log("[CHAT DEBUG] Authorization check:", {
+  authenticatedUserId: userId,
+  requestedInstituteId: instituteId,
+  requestedConversationId: conversationId,
+  databaseConversation: debugConversation,
+});
+
   // Verify conversation and active participation.
   const conversation = await prisma.conversation.findFirst({
     where: {
@@ -115,4 +137,38 @@ async function authorizeConversationRoom({
 }
 
 
-module.exports = { authenticateChatSocket,authorizeConversationRoom };
+
+async function getUserActiveConversations(userId) {
+  return prisma.conversation.findMany({
+    where: {
+      status: "ACTIVE",
+      participants: {
+        some: {
+          userId,
+          leftAt: null,
+        },
+      },
+    },
+    select: {
+      id: true,
+      instituteId: true,
+      participants: {
+        where: {
+          leftAt: null,
+          userId: {
+            not: userId,
+          },
+        },
+        select: {
+          userId: true,
+        },
+      },
+    },
+  });
+}
+
+
+
+module.exports = { authenticateChatSocket,authorizeConversationRoom 
+  ,getUserActiveConversations
+};

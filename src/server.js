@@ -5,6 +5,7 @@ const http = require("http");
 
 const env = require("./config/env");
 const app = require("./app");
+const { startAIWorker, closeAIWorker,} = require("./modules/ai/workers/ai.worker");
 
 const {
   connectDatabase,
@@ -22,6 +23,9 @@ async function startServer() {
   try {
     await connectDatabase();
 
+    // Start BullMQ AI Worker.
+    startAIWorker();
+
     // Create one HTTP server for Express and Socket.IO.
     server = http.createServer(app);
 
@@ -35,6 +39,8 @@ async function startServer() {
     });
   } catch (error) {
     console.error("Server startup failed:", error.message);
+
+    await closeAIWorker().catch(() => {});
 
     if (io) {
       await new Promise((resolve) => io.close(resolve));
