@@ -2,6 +2,7 @@ const express = require("express");
 
 const { requireAuth } = require("../../../middleware/auth.middleware");
 const { requireInstituteAdmin,} = require("../middleware/membership.middleware");
+const studentInvitationRoutes = require("./student-invitation.routes");
 
 const { createMembership, listMemberships, getMembershipById, updateMembership,} = require("../controllers/membership.controller");
 
@@ -13,6 +14,7 @@ router.post( "/:instituteId/memberships", requireInstituteAdmin, createMembershi
 router.get( "/:instituteId/memberships", requireInstituteAdmin, listMemberships);
 router.get( "/:instituteId/memberships/:id", requireInstituteAdmin, getMembershipById);
 router.patch( "/:instituteId/memberships/:id", requireInstituteAdmin, updateMembership);
+router.use("/:instituteId/student-invitations", studentInvitationRoutes);
 
 
 

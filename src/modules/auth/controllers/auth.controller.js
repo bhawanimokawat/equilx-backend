@@ -5,6 +5,13 @@ const { registerUser } = require("../services/email-verification.service");
 const authService = require("../services/auth.service");
 
 const { REFRESH_COOKIE_NAME, setRefreshCookie, clearRefreshCookie,} = require("../services/token.service");
+const { verifyLoginOtpSchema } = require("../validation/two-factor.validation");
+const { verifyLoginChallenge } = require("../services/two-factor.service");
+const { createAuthenticatedSession } = require("../services/session.service");
+const { googleLoginSchema } = require("../validation/google-auth.validation");
+const { authenticateWithGoogle } = require("../services/google-auth.service");
+const { requiresLoginTwoFactor, createLoginChallenge } = require("../services/two-factor.service");
+ 
 
 async function register(req, res, next) {
   try {
@@ -92,24 +99,35 @@ async function resendOtp(req, res, next) {
   }
 }
 
+
 async function login(req, res, next) {
   try {
-    const validation = loginSchema.safeParse(req.body);
+    const parsed = loginSchema.safeParse(req.body);
 
-    if (!validation.success) {
+    if (!parsed.success) {
       return res.status(400).json({
         success: false,
-        code: "VALIDATION_ERROR",
-        message: "Please check your login details.",
-        errors: validation.error.issues.map((issue) => ({
-          field: issue.path.join("."),
-          message: issue.message,
-        })),
+        message: "Validation failed.",
+        errors: parsed.error.issues,
       });
     }
 
-    const result = await authService.login(validation.data);
+    const result = await authService.login(parsed.data);
 
+    // Staff login: OTP verification is required.
+    if (result.twoFactorRequired) {
+      return res.status(202).json({
+        success: true,
+        message: result.message,
+        data: {
+          twoFactorRequired: true,
+          challengeId: result.challengeId,
+          expiresIn: result.expiresIn,
+        },
+      });
+    }
+
+    // Normal login: session created successfully.
     setRefreshCookie(res, result.refreshToken);
 
     return res.status(200).json({
@@ -126,6 +144,7 @@ async function login(req, res, next) {
     next(error);
   }
 }
+
 
 async function refresh(req, res, next) {
   try {
@@ -280,6 +299,104 @@ async function me(req, res) {
   });
 }
 
+
+
+async function verifyLoginOtp(req, res, next) {
+  try {
+    const parsed = verifyLoginOtpSchema.safeParse(req.body);
+
+    if (!parsed.success) {
+      return res.status(400).json({
+        success: false,
+        message: "Validation failed.",
+        errors: parsed.error.issues,
+      });
+    }
+
+    const { challengeId, otp } = parsed.data;
+
+    // Verify and consume the OTP challenge.
+    const result = await verifyLoginChallenge({
+      challengeId,
+      otp,
+    });
+
+    // Create the authenticated session only after OTP verification.
+    const session = await createAuthenticatedSession(result.user);
+
+    setRefreshCookie(res, session.refreshToken);
+
+    return res.status(200).json({
+      success: true,
+      message: "Login verification successful.",
+      data: {
+        accessToken: session.accessToken,
+        tokenType: "Bearer",
+        expiresIn: 900,
+        user: session.user,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+
+async function googleLogin(req, res, next) {
+  try {
+    const parsed = googleLoginSchema.safeParse(req.body);
+
+    if (!parsed.success) {
+      return res.status(400).json({
+        success: false,
+        message: "Validation failed.",
+        errors: parsed.error.issues,
+      });
+    }
+
+    const { user, isNewUser } = await authenticateWithGoogle(
+      parsed.data.idToken
+    );
+
+    // Mandatory OTP for staff accounts.
+    if (requiresLoginTwoFactor(user)) {
+      const challenge = await createLoginChallenge(user);
+
+      return res.status(202).json({
+        success: true,
+        message: challenge.message,
+        data: {
+          twoFactorRequired: true,
+          challengeId: challenge.challengeId,
+          expiresIn: challenge.expiresIn,
+          isNewUser,
+        },
+      });
+    }
+
+    // Create session only when 2FA is not required.
+    const session = await createAuthenticatedSession(user);
+
+    setRefreshCookie(res, session.refreshToken);
+
+    return res.status(200).json({
+      success: true,
+      message: "Google login successful.",
+      data: {
+        accessToken: session.accessToken,
+        tokenType: "Bearer",
+        expiresIn: 900,
+        user: session.user,
+        isNewUser,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+
+
 module.exports = {
   register,
   verifyEmail,
@@ -291,4 +408,6 @@ module.exports = {
   resetPassword,
   changePassword,
   me,
+  verifyLoginOtp,
+  googleLogin,
 };

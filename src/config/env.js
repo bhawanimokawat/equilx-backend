@@ -41,6 +41,12 @@ const envSchema = z.object({
 
   FRONTEND_URL: z.string().min(1).default("http://localhost:5173"),
 
+
+  GOOGLE_CLIENT_ID: z
+  .string()
+  .min(1, "GOOGLE_CLIENT_ID is required"),
+  
+
   DATABASE_URL: z
     .string()
     .min(1, "DATABASE_URL is required")

@@ -27,6 +27,7 @@ const batchRoutes = require("./modules/batches/routes/batch.routes");
 const chatRoutes = require("./modules/chat/routes/chat.routes");
 const writingRoutes = require("./modules/writing/routes/writing.routes");
 const speakingRoutes = require("./modules/speaking/routes/speaking.routes");
+const studentInvitationAcceptanceRoutes = require("./modules/memberships/routes/student-invitation-acceptance.routes");
 
 const app = express();
 
@@ -75,6 +76,7 @@ app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/users", userRoutes);
 app.use("/api/v1/organizations", organizationRoutes);
 app.use("/api/v1/institutes", membershipRoutes);
+app.use( "/api/v1/student-invitations", studentInvitationAcceptanceRoutes);
 app.use("/api/v1/institutes/:instituteId/crm", crmRoutes);
 app.use("/api/v1/cms", cmsRoutes);
 app.use("/api/v1/attempts", attemptRoutes);

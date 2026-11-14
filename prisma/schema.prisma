@@ -263,18 +263,26 @@ model InstituteMembership {
 }
 
 model MembershipInvitation {
-  id              String           @id @default(uuid()) @db.Uuid
-  instituteId     String           @db.Uuid
-  invitedByUserId String           @db.Uuid
-  invitedUserId   String?          @db.Uuid
-  inviteeEmail    String
-  status          InvitationStatus @default(PENDING)
-  expiresAt       DateTime
-  acceptedAt      DateTime?
-  reviewedById    String?          @db.Uuid
-  reviewedAt      DateTime?
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  id              String  @id @default(uuid()) @db.Uuid
+  instituteId     String  @db.Uuid
+  invitedByUserId String  @db.Uuid
+  invitedUserId   String? @db.Uuid
+
+  inviteeEmail String
+  inviteeName  String? @db.VarChar(120)
+  inviteePhone String? @db.VarChar(20)
+
+  tokenHash        String  @unique
+  approvalRequired Boolean @default(false)
+
+  status       InvitationStatus @default(PENDING)
+  expiresAt    DateTime
+  acceptedAt   DateTime?
+  reviewedById String?          @db.Uuid
+  reviewedAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   institute   Institute @relation(fields: [instituteId], references: [id], onDelete: Restrict)
   invitedBy   User      @relation("InvitationSender", fields: [invitedByUserId], references: [id], onDelete: Restrict)
