@@ -3,14 +3,17 @@ const paymentService = require("../../payments/services/payment.service");
 
 const getMySubscription = async (userId) => {
   const subscription = await prisma.subscription.findFirst({
-    where: {
-      userId,
-      instituteId: null,
-      status: "ACTIVE",
-      endsAt: {
-        gt: new Date(),
-      },
-    },
+   where: {
+  userId,
+  instituteId: null,
+  status: "ACTIVE",
+  startsAt: {
+    lte: new Date(),
+  },
+  endsAt: {
+    gt: new Date(),
+  },
+},
     include: {
       plan: true,
       planVersion: true,

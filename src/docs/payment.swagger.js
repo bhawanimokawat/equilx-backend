@@ -1,3 +1,4 @@
+
 /**
  * @swagger
  * /payments/orders:
@@ -43,12 +44,13 @@
  *       500:
  *         description: Internal server error.
  */
+
 /**
  * @swagger
  * /payments/verify:
  *   post:
  *     summary: Verify a Razorpay payment
- *     description: Verifies the Razorpay payment signature, confirms payment details with Razorpay, and activates the subscription only after successful payment capture.
+ *     description: Verifies the Razorpay payment signature and confirms payment details with Razorpay. This endpoint does not activate the subscription. Subscription activation happens only after a verified Razorpay payment.captured or order.paid webhook is successfully processed.
  *     tags: [Payments]
  *     security:
  *       - bearerAuth: []
@@ -79,11 +81,46 @@
  *                 example: pay_example123
  *               razorpay_signature:
  *                 type: string
- *                 description: Genuine 64-character hexadecimal Razorpay signature.
+ *                 description: Genuine 64-character hexadecimal Razorpay payment signature.
  *                 example: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
  *     responses:
  *       200:
- *         description: Payment verification completed successfully.
+ *         description: Payment verified successfully. Subscription activation is pending webhook confirmation.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Payment verification completed.
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     paymentId:
+ *                       type: string
+ *                       format: uuid
+ *                     orderId:
+ *                       type: string
+ *                       example: order_Tvb3TZQl2hjPUx
+ *                     providerPaymentId:
+ *                       type: string
+ *                       example: pay_example123
+ *                     paymentStatus:
+ *                       type: string
+ *                       example: CREATED
+ *                     providerPaymentStatus:
+ *                       type: string
+ *                       example: captured
+ *                     activationPending:
+ *                       type: boolean
+ *                       example: true
+ *                     message:
+ *                       type: string
+ *                       example: Payment verified. Subscription activation is pending webhook confirmation.
  *       400:
  *         description: Invalid request, payment signature, or payment details.
  *       401:
@@ -95,6 +132,7 @@
  *       503:
  *         description: Payment provider is unavailable.
  */
+
 /**
  * @swagger
  * /payments/history:
@@ -209,38 +247,160 @@
 
 /**
  * @swagger
+ * /payments/{paymentId}/refund:
+ *   post:
+ *     summary: Initiate a full or partial payment refund
+ *     description: Allows an authenticated Super Admin to initiate a full or partial refund for a successfully captured payment. The refund is initially PENDING. Idempotency-Key prevents duplicate refund requests. Final refund status is confirmed through verified Razorpay webhook events. The initiation is recorded in AuditLog.
+ *     tags: [Payments]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: paymentId
+ *         required: true
+ *         description: Internal Equilx payment ID.
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         example: b96bb178-1352-4031-9b6a-9dcef9806ff1
+ *       - in: header
+ *         name: Idempotency-Key
+ *         required: true
+ *         description: Unique key used to prevent duplicate refund requests. Reuse the same key when retrying the same request.
+ *         schema:
+ *           type: string
+ *           minLength: 16
+ *           maxLength: 128
+ *         example: equilx-refund-test-001
+ *     requestBody:
+ *       required: false
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             additionalProperties: false
+ *             properties:
+ *               amount:
+ *                 type: number
+ *                 exclusiveMinimum: 0
+ *                 description: Refund amount in INR. Omit to request the remaining refundable amount. Maximum two decimal places are allowed.
+ *                 example: 500
+ *               reason:
+ *                 type: string
+ *                 minLength: 3
+ *                 maxLength: 500
+ *                 description: Optional reason for the refund.
+ *                 example: Customer requested a partial refund.
+ *     responses:
+ *       202:
+ *         description: Refund request submitted successfully. Final status is pending Razorpay webhook confirmation.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Refund request submitted successfully.
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     refundId:
+ *                       type: string
+ *                       format: uuid
+ *                     paymentId:
+ *                       type: string
+ *                       format: uuid
+ *                     providerRefundId:
+ *                       type: string
+ *                       nullable: true
+ *                     amount:
+ *                       type: string
+ *                       example: "500.00"
+ *                     currency:
+ *                       type: string
+ *                       example: INR
+ *                     status:
+ *                       type: string
+ *                       example: PENDING
+ *                     message:
+ *                       type: string
+ *                       example: Refund submitted. Final status will be confirmed by Razorpay webhook.
+ *       400:
+ *         description: Validation error, invalid refund amount, or refund amount exceeds remaining refundable balance.
+ *       401:
+ *         description: Authentication required or access token invalid.
+ *       403:
+ *         description: Only Super Admin can initiate refunds.
+ *       404:
+ *         description: Payment record not found.
+ *       409:
+ *         description: Payment is not refundable, provider payment ID is missing, or idempotency key conflict.
+ *       503:
+ *         description: Refund submission could not be confirmed. The request remains pending. Do not retry using a new idempotency key.
+ *       500:
+ *         description: Internal server error.
+ */
+
+/**
+ * @swagger
  * /payments/webhook:
  *   post:
- *     summary: Handle Razorpay webhook events
- *     description: Receives Razorpay payment events, verifies the webhook signature using the raw request body, and processes payment updates securely.
+ *     summary: Handle Razorpay payment and refund webhook events
+ *     description: Receives Razorpay webhook events and verifies the HMAC-SHA256 signature using the original raw request body before parsing JSON. Payment activation and refund status updates are handled through verified webhook processing. Duplicate events are protected using the Razorpay event ID.
  *     tags: [Payments]
  *     parameters:
  *       - in: header
  *         name: x-razorpay-signature
  *         required: true
- *         description: HMAC signature generated by Razorpay.
+ *         description: 64-character hexadecimal HMAC-SHA256 signature generated by Razorpay.
  *         schema:
  *           type: string
+ *           pattern: '^[a-fA-F0-9]{64}$'
+ *         example: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
  *       - in: header
  *         name: x-razorpay-event-id
- *         required: false
+ *         required: true
  *         description: Unique Razorpay webhook event ID used for duplicate-event protection.
  *         schema:
  *           type: string
+ *         example: evt_test_123
  *     requestBody:
  *       required: true
+ *       description: Original Razorpay webhook JSON payload. The server verifies the signature against the raw request body before parsing JSON.
  *       content:
  *         application/json:
  *           schema:
  *             type: object
- *             description: Razorpay webhook event payload.
+ *             required:
+ *               - event
+ *             properties:
+ *               event:
+ *                 type: string
+ *                 description: Razorpay webhook event name.
+ *                 enum:
+ *                   - payment.captured
+ *                   - order.paid
+ *                   - payment.failed
+ *                   - refund.created
+ *                   - refund.processed
+ *                   - refund.failed
+ *                 example: refund.processed
+ *               payload:
+ *                 type: object
+ *                 description: Razorpay event payload containing the relevant payment or refund entity.
  *     responses:
  *       200:
- *         description: Webhook event received or processed successfully.
+ *         description: Webhook received or processed successfully. Already processed duplicate events are handled idempotently.
  *       400:
- *         description: Invalid webhook signature or malformed payload.
+ *         description: Invalid raw body, missing or invalid headers, invalid signature, or malformed JSON payload.
  *       409:
  *         description: Conflicting duplicate webhook event.
+ *       503:
+ *         description: Webhook processing is unavailable because the webhook secret is not configured.
  *       500:
  *         description: Webhook processing failed.
  */

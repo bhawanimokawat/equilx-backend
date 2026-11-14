@@ -1,3 +1,4 @@
+
 const express = require("express");
 
 const { requireAuth } = require("../../../middleware/auth.middleware");
@@ -29,13 +30,19 @@ const {
 
 const router = express.Router({ mergeParams: true });
 
-// Authenticate first, then authorize institute-level CRM access.
+// Authentication and authorization
 router.use(requireAuth);
 router.use(requireCrmAccess);
 
 // Lead management
 router.post("/leads", createLead);
 router.get("/leads", listLeads);
+
+// Static routes BEFORE dynamic :leadId routes
+router.get("/leads/assignable-users", listAssignableUsers);
+router.get("/leads/export", exportLeadsCsvHandler);
+
+// Dynamic lead routes
 router.get("/leads/:leadId", getLeadById);
 router.patch("/leads/:leadId", updateLead);
 router.delete("/leads/:leadId", deleteLead);
@@ -44,41 +51,26 @@ router.delete("/leads/:leadId", deleteLead);
 router.patch("/leads/:leadId/status", updateLeadStatus);
 router.get("/leads/:leadId/status-history", getLeadStatusHistory);
 
-
-//assgiment
-
-
+// Assignment
 router.patch("/leads/:leadId/assignment", assignLead);
 router.get("/leads/:leadId/assignment-history", getLeadAssignmentHistory);
-router.get("/leads/assignable-users", listAssignableUsers);
 
-
-
-//leads
-
+// Follow-ups
 router.post("/leads/:leadId/follow-ups", createLeadFollowUpHandler);
 router.get("/follow-ups", listLeadFollowUpsHandler);
 router.patch("/follow-ups/:followUpId/complete", completeLeadFollowUpHandler);
 router.patch("/follow-ups/:followUpId/cancel", cancelLeadFollowUpHandler);
 
+// Activities
+router.post("/leads/:leadId/activities", createLeadActivityHandler);
+router.get("/leads/:leadId/activities", listLeadActivitiesHandler);
 
-
-// activity
-
-router.post(  "/leads/:leadId/activities",  createLeadActivityHandler);
-router.get( "/leads/:leadId/activities", listLeadActivitiesHandler);
-
-
-
+// Lead sources
 router.post("/lead-sources", createLeadSourceHandler);
 router.get("/lead-sources", listLeadSourcesHandler);
-router.patch( "/lead-sources/:sourceId", updateLeadSourceHandler);
+router.patch("/lead-sources/:sourceId", updateLeadSourceHandler);
 
-
-
-
-router.get("/leads/export", exportLeadsCsvHandler);
+// CSV import
 router.post("/leads/import", importLeadsCsvHandler);
-
 
 module.exports = router;

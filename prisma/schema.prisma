@@ -376,6 +376,7 @@ enum PaymentStatus {
   FAILED
   PARTIALLY_REFUNDED
   REFUNDED
+  EXPIRED
 }
 
 enum PaymentProvider {
@@ -486,6 +487,7 @@ model Payment {
   failureCode       String?
   failureMessage    String?
   paidAt            DateTime?
+  expiresAt         DateTime?
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
 
@@ -495,6 +497,7 @@ model Payment {
   refunds       PaymentRefund[]
 
   @@index([subscriptionId, status, createdAt])
+  @@index([status, expiresAt])
 }
 
 model PaymentWebhookEvent {
@@ -577,6 +580,7 @@ model PaymentRefund {
   id               String        @id @default(uuid()) @db.Uuid
   paymentId        String        @db.Uuid
   providerRefundId String?       @unique
+  idempotencyKey   String?       @unique @db.VarChar(128)
   amount           Decimal       @db.Decimal(12, 2)
   currency         String        @default("INR") @db.VarChar(3)
   reason           String?
@@ -1419,6 +1423,10 @@ model NotificationPreference {
   inAppEnabled        Boolean  @default(true)
   emailEnabled        Boolean  @default(true)
   messageEmailEnabled Boolean  @default(true)
+  marketingEmailEnabled         Boolean   @default(false)
+  marketingEmailConsentAt       DateTime?
+  marketingEmailUnsubscribedAt  DateTime?
+  lastMarketingEmailAt          DateTime?
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 

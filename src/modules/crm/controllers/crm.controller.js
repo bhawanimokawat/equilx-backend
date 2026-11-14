@@ -1,5 +1,10 @@
+const { z } = require("zod");
 const crmService = require("../services/crm.service");
 const validation = require("../validation/crm.validation");
+
+const sourceIdParamSchema = z.object({
+  sourceId: z.string().uuid(),
+});
 
 function sendValidationError(res, error) {
   return res.status(400).json({
@@ -260,10 +265,11 @@ async function listAssignableUsers(req, res, next) {
 
 
 
+
 async function createLeadFollowUpHandler(req, res, next) {
   try {
-    const params = leadIdParamSchema.safeParse(req.params);
-    const body = createLeadFollowUpSchema.safeParse(req.body);
+    const params = validation.leadIdParamSchema.safeParse(req.params);
+    const body = validation.createLeadFollowUpSchema.safeParse(req.body);
 
     if (!params.success || !body.success) {
       return res.status(400).json({
@@ -276,7 +282,7 @@ async function createLeadFollowUpHandler(req, res, next) {
       });
     }
 
-    const followUp = await createLeadFollowUp(
+    const followUp = await crmService.createLeadFollowUp(
       req.crmScope,
       params.data.leadId,
       body.data
@@ -301,7 +307,7 @@ async function createLeadFollowUpHandler(req, res, next) {
 
 async function listLeadFollowUpsHandler(req, res, next) {
   try {
-    const query = listFollowUpsSchema.safeParse(req.query);
+    const query = validation.listFollowUpsSchema.safeParse(req.query);
 
     if (!query.success) {
       return res.status(400).json({
@@ -311,7 +317,7 @@ async function listLeadFollowUpsHandler(req, res, next) {
       });
     }
 
-    const result = await listLeadFollowUps(
+    const result = await crmService.listLeadFollowUps(
       req.crmScope,
       query.data
     );
@@ -336,7 +342,7 @@ async function cancelLeadFollowUpHandler(req, res, next) {
 
 async function changeLeadFollowUpStatus(req, res, next, status) {
   try {
-    const params = followUpIdParamSchema.safeParse(req.params);
+    const params = validation.followUpIdParamSchema.safeParse(req.params);
 
     if (!params.success) {
       return res.status(400).json({
@@ -346,7 +352,7 @@ async function changeLeadFollowUpStatus(req, res, next, status) {
       });
     }
 
-    const followUp = await updateLeadFollowUpStatus(
+    const followUp = await crmService.updateLeadFollowUpStatus(
       req.crmScope,
       params.data.followUpId,
       status
@@ -371,10 +377,13 @@ async function changeLeadFollowUpStatus(req, res, next, status) {
 
 
 
+
 async function createLeadActivityHandler(req, res, next) {
+  console.log("ACTIVITY CONTROLLER HIT");
+
   try {
-    const params = leadIdParamSchema.safeParse(req.params);
-    const body = createActivitySchema.safeParse(req.body);
+    const params = validation.leadIdParamSchema.safeParse(req.params);
+    const body = validation.createActivitySchema.safeParse(req.body);
 
     if (!params.success || !body.success) {
       return res.status(400).json({
@@ -387,7 +396,7 @@ async function createLeadActivityHandler(req, res, next) {
       });
     }
 
-    const activity = await createLeadActivity(
+    const activity = await crmService.createLeadActivity(
       req.crmScope,
       params.data.leadId,
       body.data
@@ -406,13 +415,16 @@ async function createLeadActivityHandler(req, res, next) {
       data: activity,
     });
   } catch (error) {
+    console.error("CREATE ACTIVITY CONTROLLER ERROR:", error);
     next(error);
   }
 }
 
 async function listLeadActivitiesHandler(req, res, next) {
+  console.log("LIST LEAD ACTIVITIES CONTROLLER HIT");
+
   try {
-    const params = leadIdParamSchema.safeParse(req.params);
+    const params = validation.leadIdParamSchema.safeParse(req.params);
 
     const querySchema = z.object({
       page: z.coerce.number().int().min(1).default(1),
@@ -432,7 +444,7 @@ async function listLeadActivitiesHandler(req, res, next) {
       });
     }
 
-    const result = await listLeadActivities(
+    const result = await crmService.listLeadActivities(
       req.crmScope,
       params.data.leadId,
       query.data.page,
@@ -453,14 +465,14 @@ async function listLeadActivitiesHandler(req, res, next) {
       pagination: result.pagination,
     });
   } catch (error) {
+    console.error("LIST LEAD ACTIVITIES ERROR:", error);
     next(error);
   }
 }
 
-
 async function createLeadSourceHandler(req, res, next) {
   try {
-    const body = createLeadSourceSchema.safeParse(req.body);
+    const body = validation.createLeadSourceSchema.safeParse(req.body);
 
     if (!body.success) {
       return res.status(400).json({
@@ -470,7 +482,10 @@ async function createLeadSourceHandler(req, res, next) {
       });
     }
 
-    const source = await createLeadSource(req.crmScope, body.data);
+    const source = await crmService.createLeadSource(
+      req.crmScope,
+      body.data
+    );
 
     return res.status(201).json({
       success: true,
@@ -480,7 +495,6 @@ async function createLeadSourceHandler(req, res, next) {
     next(error);
   }
 }
-
 async function listLeadSourcesHandler(req, res, next) {
   try {
     const query = z.object({
@@ -495,7 +509,7 @@ async function listLeadSourcesHandler(req, res, next) {
       });
     }
 
-    const sources = await listLeadSources(
+    const sources = await crmService.listLeadSources(
       req.crmScope,
       query.data.includeInactive === "true"
     );
@@ -508,11 +522,10 @@ async function listLeadSourcesHandler(req, res, next) {
     next(error);
   }
 }
-
 async function updateLeadSourceHandler(req, res, next) {
   try {
     const params = sourceIdParamSchema.safeParse(req.params);
-    const body = updateLeadSourceSchema.safeParse(req.body);
+   const body = validation.updateLeadSourceSchema.safeParse(req.body);
 
     if (!params.success || !body.success) {
       return res.status(400).json({
@@ -525,7 +538,7 @@ async function updateLeadSourceHandler(req, res, next) {
       });
     }
 
-    const source = await updateLeadSource(
+    const source = await crmService.updateLeadSource(
       req.crmScope,
       params.data.sourceId,
       body.data
@@ -544,15 +557,16 @@ async function updateLeadSourceHandler(req, res, next) {
       data: source,
     });
   } catch (error) {
-    next(error);
-  }
+  console.error("UPDATE LEAD SOURCE ERROR:", error);
+  next(error);
+}
 }
 
 
 
 async function exportLeadsCsvHandler(req, res, next) {
   try {
-    const csv = await exportLeadsCsv(req.crmScope);
+    const csv = await crmService.exportLeadsCsv(req.crmScope);
 
     const filename = `equilx-leads-${new Date()
       .toISOString()
@@ -567,6 +581,7 @@ async function exportLeadsCsvHandler(req, res, next) {
 
     return res.status(200).send("\uFEFF" + csv);
   } catch (error) {
+    console.error("EXPORT LEADS ERROR:", error);
     next(error);
   }
 }
@@ -575,7 +590,7 @@ async function exportLeadsCsvHandler(req, res, next) {
 
 async function importLeadsCsvHandler(req, res, next) {
   try {
-    const body = importLeadsCsvSchema.safeParse(req.body);
+    const body = validation.importLeadsCsvSchema.safeParse(req.body);
 
     if (!body.success) {
       return res.status(400).json({
@@ -585,7 +600,7 @@ async function importLeadsCsvHandler(req, res, next) {
       });
     }
 
-    const report = await importLeadsCsv(
+    const report = await crmService.importLeadsCsv(
       req.crmScope,
       body.data.csv
     );
@@ -595,10 +610,10 @@ async function importLeadsCsvHandler(req, res, next) {
       data: report,
     });
   } catch (error) {
+    console.error("IMPORT LEADS ERROR:", error);
     next(error);
   }
 }
-
 
 module.exports = {
   createLead,

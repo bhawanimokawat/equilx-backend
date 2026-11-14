@@ -1,3 +1,4 @@
+
 const jwt = require("jsonwebtoken");
 const { prisma } = require("../config/database");
 const env = require("../config/env");
@@ -48,7 +49,11 @@ async function requireAuth(req, res, next) {
         isActive: true,
         createdAt: true,
         profile: {
-          select: { name: true, phone: true, avatarUrl: true },
+          select: {
+            name: true,
+            phone: true,
+            avatarUrl: true,
+          },
         },
       },
     });
@@ -84,4 +89,32 @@ async function requireAuth(req, res, next) {
   }
 }
 
-module.exports = { requireAuth };
+// Only Super Admin can access this route.
+function requireSuperAdmin(req, res, next) {
+  if (!req.user) {
+    return res.status(401).json({
+      success: false,
+      error: {
+        code: "AUTHENTICATION_REQUIRED",
+        message: "Please log in to continue.",
+      },
+    });
+  }
+
+  if (req.user.platformRole !== "SUPER_ADMIN") {
+    return res.status(403).json({
+      success: false,
+      error: {
+        code: "FORBIDDEN",
+        message: "Only Super Admin can perform this action.",
+      },
+    });
+  }
+
+  next();
+}
+
+module.exports = {
+  requireAuth,
+  requireSuperAdmin,
+};

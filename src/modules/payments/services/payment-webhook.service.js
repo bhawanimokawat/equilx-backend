@@ -4,7 +4,11 @@ const crypto = require("crypto");
 const { prisma } = require("../../../config/database");
 const { activateSuccessfulPayment } = require("./payment-activation.service");
 
-const { PaymentStatus, PaymentProvider } = require("@prisma/client");
+const {
+    PaymentStatus,
+    PaymentProvider,
+    Prisma,
+} = require("@prisma/client");
 
 class PaymentWebhookService {
     createError(message, statusCode, code) {
@@ -55,6 +59,10 @@ class PaymentWebhookService {
         );
     }
 
+    // =========================================================
+    // SAVE WEBHOOK EVENT
+    // =========================================================
+
     async saveWebhookEvent({ eventId, eventType, payloadHash }) {
         try {
             return await prisma.paymentWebhookEvent.create({
@@ -98,6 +106,10 @@ class PaymentWebhookService {
         }
     }
 
+    // =========================================================
+    // SUCCESSFUL PAYMENT
+    // =========================================================
+
     async processCapturedPayment({ webhookEvent, entity }) {
         const payment = await this.findPayment(entity.order_id);
 
@@ -125,7 +137,14 @@ class PaymentWebhookService {
             );
         }
 
-        // Save the payment association before activation.
+        if (!entity.id) {
+            throw this.createError(
+                "Provider payment ID is missing.",
+                400,
+                "WEBHOOK_PAYMENT_ID_MISSING"
+            );
+        }
+
         await prisma.paymentWebhookEvent.update({
             where: { id: webhookEvent.id },
             data: {
@@ -133,21 +152,35 @@ class PaymentWebhookService {
             },
         });
 
-        // This shared function activates the subscription and creates
-        // the invoice atomically. It also supports duplicate activation.
-        await activateSuccessfulPayment({
+        // Subscription activation remains exclusively webhook-driven.
+        const activationResult = await activateSuccessfulPayment({
             paymentId: payment.id,
             providerPaymentId: entity.id,
             changedByUserId: null,
+            allowExpiredRecovery: true,
         });
 
         return {
             processed: true,
             eventType: webhookEvent.eventType,
             paymentId: payment.id,
-            message: "Payment successfully activated.",
+            paymentStatus: activationResult.paymentStatus,
+            subscriptionStatus: activationResult.subscriptionStatus,
+            invoiceId: activationResult.invoiceId,
+            recoveredFromExpired:
+                activationResult.recoveredFromExpired || false,
+            alreadyActivated: activationResult.alreadyActivated || false,
+            message: activationResult.recoveredFromExpired
+                ? "Expired payment successfully recovered and subscription activated."
+                : activationResult.alreadyActivated
+                    ? "Payment was already activated."
+                    : "Payment successfully activated.",
         };
     }
+
+    // =========================================================
+    // FAILED PAYMENT
+    // =========================================================
 
     async processFailedPayment({ webhookEvent, entity }) {
         const payment = await this.findPayment(entity.order_id);
@@ -204,6 +237,306 @@ class PaymentWebhookService {
         };
     }
 
+    // =========================================================
+    // FIND REFUND RECORD
+    // =========================================================
+
+    async findRefund(entity) {
+        if (!entity || !entity.id || !entity.payment_id) {
+            return null;
+        }
+
+        // First lookup: internal refund ID in Razorpay notes.
+        const internalRefundId = entity.notes?.refundId;
+
+        if (internalRefundId) {
+            const refund = await prisma.paymentRefund.findUnique({
+                where: {
+                    id: internalRefundId,
+                },
+                include: {
+                    payment: true,
+                },
+            });
+
+            if (refund) {
+                return refund;
+            }
+        }
+
+        // Second lookup: Razorpay refund ID.
+        const existingRefund = await prisma.paymentRefund.findUnique({
+            where: {
+                providerRefundId: entity.id,
+            },
+            include: {
+                payment: true,
+            },
+        });
+
+        if (existingRefund) {
+            return existingRefund;
+        }
+
+        // Fallback: find one unambiguous pending refund.
+        const payment = await prisma.payment.findFirst({
+            where: {
+                provider: PaymentProvider.RAZORPAY,
+                providerPaymentId: entity.payment_id,
+            },
+        });
+
+        if (!payment) {
+            return null;
+        }
+
+        const refundAmount = new Prisma.Decimal(entity.amount).div(100);
+
+        const pendingRefunds = await prisma.paymentRefund.findMany({
+            where: {
+                paymentId: payment.id,
+                status: PaymentStatus.PENDING,
+                amount: refundAmount,
+            },
+            include: {
+                payment: true,
+            },
+            take: 2,
+        });
+
+        // Never guess if multiple pending refunds have the same amount.
+        if (pendingRefunds.length !== 1) {
+            return null;
+        }
+
+        return pendingRefunds[0];
+    }
+
+    // =========================================================
+    // PROCESS RAZORPAY REFUND WEBHOOK
+    // =========================================================
+
+    async processRefundEvent({ webhookEvent, entity }) {
+        if (
+            !entity ||
+            !entity.id ||
+            !entity.payment_id ||
+            !Number.isSafeInteger(entity.amount) ||
+            entity.amount <= 0 ||
+            !entity.currency
+        ) {
+            throw this.createError(
+                "Refund details are missing or invalid.",
+                400,
+                "WEBHOOK_REFUND_ENTITY_INVALID"
+            );
+        }
+
+        const refund = await this.findRefund(entity);
+
+        if (!refund) {
+            throw this.createError(
+                "Matching internal refund record was not found.",
+                503,
+                "WEBHOOK_REFUND_NOT_FOUND"
+            );
+        }
+
+        if (
+            refund.payment.providerPaymentId !== entity.payment_id ||
+            refund.currency !== entity.currency
+        ) {
+            throw this.createError(
+                "Refund provider details do not match our records.",
+                409,
+                "WEBHOOK_REFUND_MISMATCH"
+            );
+        }
+
+        const expectedAmount = Number(
+            refund.amount.mul(100).toFixed(0)
+        );
+
+        if (expectedAmount !== entity.amount) {
+            throw this.createError(
+                "Refund amount does not match our records.",
+                409,
+                "WEBHOOK_REFUND_AMOUNT_MISMATCH"
+            );
+        }
+
+        let targetRefundStatus;
+
+        switch (webhookEvent.eventType) {
+            case "refund.created":
+                targetRefundStatus = PaymentStatus.PENDING;
+                break;
+
+            case "refund.processed":
+                targetRefundStatus = PaymentStatus.REFUNDED;
+                break;
+
+            case "refund.failed":
+                targetRefundStatus = PaymentStatus.FAILED;
+                break;
+
+            default:
+                throw this.createError(
+                    "Unsupported refund event.",
+                    400,
+                    "UNSUPPORTED_REFUND_EVENT"
+                );
+        }
+
+        const result = await prisma.$transaction(async (tx) => {
+            // Serialize refund updates for the same payment.
+            await tx.$queryRaw`
+                SELECT id
+                FROM "Payment"
+                WHERE id = ${refund.paymentId}::uuid
+                FOR UPDATE
+            `;
+
+            const currentRefund = await tx.paymentRefund.findUnique({
+                where: {
+                    id: refund.id,
+                },
+            });
+
+            if (!currentRefund) {
+                throw this.createError(
+                    "Refund record no longer exists.",
+                    404,
+                    "REFUND_NOT_FOUND"
+                );
+            }
+
+            // Do not downgrade completed or failed refunds.
+            let finalRefundStatus = currentRefund.status;
+
+            if (
+                currentRefund.status !== PaymentStatus.REFUNDED &&
+                currentRefund.status !== PaymentStatus.FAILED
+            ) {
+                finalRefundStatus = targetRefundStatus;
+            }
+
+            const updateData = {
+                providerRefundId: entity.id,
+                status: finalRefundStatus,
+            };
+
+            if (finalRefundStatus === PaymentStatus.REFUNDED) {
+                updateData.refundedAt =
+                    currentRefund.refundedAt || new Date();
+            }
+
+            await tx.paymentRefund.update({
+                where: {
+                    id: currentRefund.id,
+                },
+                data: updateData,
+            });
+
+            // Link webhook event to payment.
+            await tx.paymentWebhookEvent.update({
+                where: {
+                    id: webhookEvent.id,
+                },
+                data: {
+                    paymentId: refund.paymentId,
+                },
+            });
+
+            // Calculate completed refund total.
+            const totals = await tx.paymentRefund.aggregate({
+                where: {
+                    paymentId: refund.paymentId,
+                    status: PaymentStatus.REFUNDED,
+                },
+                _sum: {
+                    amount: true,
+                },
+            });
+
+            const currentPayment = await tx.payment.findUnique({
+                where: {
+                    id: refund.paymentId,
+                },
+            });
+
+            if (!currentPayment) {
+                throw this.createError(
+                    "Associated payment record was not found.",
+                    404,
+                    "PAYMENT_NOT_FOUND"
+                );
+            }
+
+            const refundedAmount =
+                totals._sum.amount || new Prisma.Decimal(0);
+
+            if (refundedAmount.gt(currentPayment.amountInclGst)) {
+                throw this.createError(
+                    "Total refunded amount exceeds the original payment amount.",
+                    409,
+                    "REFUND_TOTAL_EXCEEDS_PAYMENT"
+                );
+            }
+
+            let paymentStatus = currentPayment.status;
+
+            if (
+                [
+                    PaymentStatus.SUCCEEDED,
+                    PaymentStatus.PARTIALLY_REFUNDED,
+                    PaymentStatus.REFUNDED,
+                ].includes(currentPayment.status)
+            ) {
+                if (refundedAmount.isZero()) {
+                    paymentStatus = PaymentStatus.SUCCEEDED;
+                } else if (
+                    refundedAmount.gte(currentPayment.amountInclGst)
+                ) {
+                    paymentStatus = PaymentStatus.REFUNDED;
+                } else {
+                    paymentStatus = PaymentStatus.PARTIALLY_REFUNDED;
+                }
+
+                if (paymentStatus !== currentPayment.status) {
+                    await tx.payment.update({
+                        where: {
+                            id: currentPayment.id,
+                        },
+                        data: {
+                            status: paymentStatus,
+                        },
+                    });
+                }
+            }
+
+            return {
+                refundId: currentRefund.id,
+                providerRefundId: entity.id,
+                refundStatus: finalRefundStatus,
+                paymentId: currentPayment.id,
+                paymentStatus,
+                totalRefunded: refundedAmount.toString(),
+            };
+        });
+
+        return {
+            processed: true,
+            eventType: webhookEvent.eventType,
+            ...result,
+            message: "Refund webhook event processed successfully.",
+        };
+    }
+
+    // =========================================================
+    // WEBHOOK EVENT STATUS
+    // =========================================================
+
     async markProcessed(webhookEventId) {
         await prisma.paymentWebhookEvent.update({
             where: { id: webhookEventId },
@@ -226,6 +559,10 @@ class PaymentWebhookService {
             // Preserve the original processing error.
         }
     }
+
+    // =========================================================
+    // MAIN WEBHOOK HANDLER
+    // =========================================================
 
     async handleWebhookEvent({ eventId, event, rawBody }) {
         if (
@@ -260,8 +597,8 @@ class PaymentWebhookService {
         }
 
         try {
-            const paymentEntity =
-                event.payload?.payment?.entity;
+            const paymentEntity = event.payload?.payment?.entity;
+            const refundEntity = event.payload?.refund?.entity;
 
             let result;
 
@@ -301,9 +638,28 @@ class PaymentWebhookService {
                     break;
                 }
 
+                case "refund.created":
+                case "refund.processed":
+                case "refund.failed": {
+                    if (!refundEntity) {
+                        throw this.createError(
+                            "Refund details are missing from the webhook.",
+                            400,
+                            "WEBHOOK_REFUND_ENTITY_MISSING"
+                        );
+                    }
+
+                    result = await this.processRefundEvent({
+                        webhookEvent,
+                        entity: refundEntity,
+                    });
+
+                    break;
+                }
+
                 default: {
-                    // Unsupported events are recorded but do not change
-                    // payment or subscription state.
+                    // Unsupported events are recorded but do not
+                    // change payment or subscription state.
                     result = {
                         processed: true,
                         ignored: true,

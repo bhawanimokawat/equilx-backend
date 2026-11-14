@@ -2,7 +2,7 @@ const bcrypt = require("bcryptjs");
 
 const { registerSchema, verifyEmailSchema, resendOtpSchema, loginSchema, forgotPasswordSchema, resetPasswordSchema, changePasswordSchema } = require("../validation/auth.validation");
 const { registerUser } = require("../services/email-verification.service");
-const authService = require("../services/auth.service");
+const authService = require("../services/auths.service");
 
 const { REFRESH_COOKIE_NAME, setRefreshCookie, clearRefreshCookie,} = require("../services/token.service");
 const { verifyLoginOtpSchema } = require("../validation/two-factor.validation");

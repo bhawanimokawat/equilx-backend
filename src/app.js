@@ -1,33 +1,45 @@
+
 const express = require("express");
 const helmet = require("helmet");
 const cors = require("cors");
 const cookieParser = require("cookie-parser");
 
 const env = require("./config/env");
+
 const authRoutes = require("./modules/auth/routes/auth.routes");
-const { apiLimiter, } = require("./middleware/rate-limit.middleware");
-const { notFoundHandler, errorHandler, } = require("./middleware/error.middleware");
 const userRoutes = require("./modules/users/routes/user.routes");
 const organizationRoutes = require("./modules/organizations/routes/organization.routes");
-const membershipRoutes = require("./modules/memberships/routes/membership.routes")
+const membershipRoutes = require("./modules/memberships/routes/membership.routes");
+const studentInvitationAcceptanceRoutes = require("./modules/memberships/routes/student-invitation-acceptance.routes");
+
 const docsRoutes = require("./routes/docs.routes");
+
 const crmRoutes = require("./modules/crm/routes/crm.routes");
 const cmsRoutes = require("./modules/cms/routes/cms.routes");
 const attemptRoutes = require("./modules/attempts/routes/attempt.routes");
 const mockRoutes = require("./modules/mock/routes/mock.routes");
 const practiceRoutes = require("./modules/practice/routes/practice.routes");
 const resultRoutes = require("./modules/results/routes/result.routes");
+
+const marketingRoutes = require("./modules/marketing/routes/marketing.routes");
+
 const paymentRoutes = require("./modules/payments/routes/payment.routes");
 const paymentController = require("./modules/payments/controllers/payment.controller");
 const subscriptionRoutes = require("./modules/subscriptions/routes/subscription.routes");
 const planRoutes = require("./modules/plans/routes/plan.routes");
 const invoiceRoutes = require("./modules/invoices/routes/invoice.routes");
+
 const assignmentRoutes = require("./modules/assignments/routes/assignment.routes");
 const batchRoutes = require("./modules/batches/routes/batch.routes");
 const chatRoutes = require("./modules/chat/routes/chat.routes");
 const writingRoutes = require("./modules/writing/routes/writing.routes");
 const speakingRoutes = require("./modules/speaking/routes/speaking.routes");
-const studentInvitationAcceptanceRoutes = require("./modules/memberships/routes/student-invitation-acceptance.routes");
+
+const { apiLimiter } = require("./middleware/rate-limit.middleware");
+const {
+  notFoundHandler,
+  errorHandler,
+} = require("./middleware/error.middleware");
 
 const app = express();
 
@@ -51,10 +63,10 @@ app.use(
   })
 );
 
-// Apply general API rate limiting once.
+// General API rate limiting
 app.use("/api", apiLimiter);
 
-// Razorpay webhook: preserve the original request body for signature verification.
+// Razorpay webhook - raw body required for signature verification
 app.post(
   "/api/v1/payments/webhook",
   express.raw({
@@ -64,36 +76,41 @@ app.post(
   paymentController.handleWebhook
 );
 
-
-// Parse requests before mounting routes.
+// Request body parsing
 app.use(express.json({ limit: "100kb" }));
 app.use(express.urlencoded({ extended: false, limit: "20kb" }));
 app.use(cookieParser());
 
-// API routes.
+// API routes
 app.use("/api/v1/docs", docsRoutes);
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/users", userRoutes);
 app.use("/api/v1/organizations", organizationRoutes);
 app.use("/api/v1/institutes", membershipRoutes);
-app.use( "/api/v1/student-invitations", studentInvitationAcceptanceRoutes);
+app.use("/api/v1/student-invitations", studentInvitationAcceptanceRoutes);
+
 app.use("/api/v1/institutes/:instituteId/crm", crmRoutes);
 app.use("/api/v1/cms", cmsRoutes);
+
 app.use("/api/v1/attempts", attemptRoutes);
 app.use("/api/v1/mock", mockRoutes);
 app.use("/api/v1/practice", practiceRoutes);
 app.use("/api/v1/results", resultRoutes);
+
+app.use("/api/v1/marketing", marketingRoutes);
+
 app.use("/api/v1/payments", paymentRoutes);
 app.use("/api/v1/subscriptions", subscriptionRoutes);
 app.use("/api/v1/plans", planRoutes);
 app.use("/api/v1/invoices", invoiceRoutes);
+
 app.use("/api/v1", assignmentRoutes);
 app.use("/api/v1", batchRoutes);
 app.use("/api/v1", chatRoutes);
-app.use("/api/v1/writing",writingRoutes);
-app.use("/api/v1/speaking",speakingRoutes);
+app.use("/api/v1/writing", writingRoutes);
+app.use("/api/v1/speaking", speakingRoutes);
 
-// Health check.
+// Health check
 app.get("/api/v1/health", (req, res) => {
   res.status(200).json({
     success: true,
@@ -101,17 +118,8 @@ app.get("/api/v1/health", (req, res) => {
   });
 });
 
-// Handle unknown routes and errors last.
+// Error handling
 app.use(notFoundHandler);
 app.use(errorHandler);
 
 module.exports = app;
-
-
-
-
-
-
-
-
-

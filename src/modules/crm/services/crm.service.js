@@ -1,6 +1,6 @@
 const { prisma } = require("../../../config/database");
 const { parse } = require("csv-parse/sync");
-
+const validationSchemas = require("../validation/crm.validation");
 const LEAD_SELECT = {
   id: true,
   instituteId: true,
@@ -982,21 +982,31 @@ async function createLeadActivity(scope, leadId, input) {
     });
 
     if (!lead) return null;
-
-    return tx.leadActivity.create({
-      data: {
-        leadId: lead.id,
-        createdById: scope.userId,
-        type: input.type,
-        subject: input.subject ?? null,
-        description: input.description ?? null,
-        outcome: input.outcome ?? null,
-        followUpAt: input.followUpAt ?? null,
+console.log("CREATE ACTIVITY INPUT:", input);
+console.log("CRM SCOPE:", scope);
+console.log("LEAD ID:", leadId);
+   return tx.leadActivity.create({
+  data: {
+    lead: {
+      connect: {
+        id: leadId,
       },
+    },
+    actor: {
+      connect: {
+        id: scope.userId,
+      },
+    },
+    type: input.type,
+    subject: input.subject ?? null,
+    description: input.description ?? null,
+    outcome: input.outcome ?? null,
+    followUpAt: input.followUpAt ?? null,
+  },
       select: {
         id: true,
         leadId: true,
-        createdById: true,
+        actorId: true,
         type: true,
         subject: true,
         description: true,
@@ -1031,17 +1041,23 @@ async function listLeadActivities(scope, leadId, page = 1, limit = 20) {
       take: limit,
       select: {
         id: true,
+        leadId: true,
+        actorId: true,
         type: true,
         subject: true,
         description: true,
         outcome: true,
         followUpAt: true,
         createdAt: true,
-        createdBy: {
+        actor: {
           select: {
             id: true,
             email: true,
-            profile: { select: { name: true } },
+            profile: {
+              select: {
+                name: true,
+              },
+            },
           },
         },
       },
@@ -1059,8 +1075,6 @@ async function listLeadActivities(scope, leadId, page = 1, limit = 20) {
     },
   };
 }
-
-
 async function createLeadSource(scope, input) {
   requireInstituteScope(scope?.instituteId);
 
@@ -1420,14 +1434,14 @@ async function importLeadsCsv(scope, csv) {
       tags,
     };
 
-    const validation = createLeadSchema.safeParse(input);
+   const parsed = validationSchemas.createLeadSchema.safeParse(input);
 
-    if (!validation.success) {
+    if (!parsed.success) {
       report.rejected += 1;
       report.results.push({
         row: rowNumber,
         status: "REJECTED",
-        reason: validation.error.issues.map((issue) => ({
+        reason: parsed.error.issues.map((issue) => ({
           field: issue.path.join("."),
           message: issue.message,
         })),
@@ -1436,7 +1450,7 @@ async function importLeadsCsv(scope, csv) {
     }
 
     try {
-      const lead = await createLead(scope, validation.data);
+      const lead = await createLead(scope, parsed.data);
 
       if (normalizedPhone) {
         existingPhones.add(normalizedPhone);

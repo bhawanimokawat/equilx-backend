@@ -1,11 +1,14 @@
-
 require("dotenv").config();
 
 const http = require("http");
 
 const env = require("./config/env");
 const app = require("./app");
-const { startAIWorker, closeAIWorker,} = require("./modules/ai/workers/ai.worker");
+
+const {
+  startAIWorker,
+  closeAIWorker,
+} = require("./modules/ai/workers/ai.worker");
 
 const {
   connectDatabase,
@@ -15,16 +18,47 @@ const {
 const { initializeSocket } = require("./config/socket");
 const { closeRedis } = require("./config/redis");
 
+const {
+  expirePendingPayments,
+} = require("./modules/payments/services/payment-expiry.service");
+
 let server;
 let io;
 let shuttingDown = false;
+let paymentExpiryInterval;
+
+async function runPaymentExpiry() {
+  try {
+    const result = await expirePendingPayments();
+
+    if (result.expiredCount > 0) {
+      console.log(
+        `[Payment Expiry] ${result.expiredCount} payment(s) expired.`
+      );
+    }
+  } catch (error) {
+    console.error(
+      "[Payment Expiry] Scheduler error:",
+      error.message
+    );
+  }
+}
 
 async function startServer() {
   try {
     await connectDatabase();
 
-    // Start BullMQ AI Worker.
+    // Start the AI BullMQ worker.
     startAIWorker();
+
+    // Run payment expiry check immediately.
+    await runPaymentExpiry();
+
+    // Repeat payment expiry check every 60 seconds.
+    paymentExpiryInterval = setInterval(
+      runPaymentExpiry,
+      60 * 1000
+    );
 
     // Create one HTTP server for Express and Socket.IO.
     server = http.createServer(app);
@@ -40,13 +74,20 @@ async function startServer() {
   } catch (error) {
     console.error("Server startup failed:", error.message);
 
+    if (paymentExpiryInterval) {
+      clearInterval(paymentExpiryInterval);
+      paymentExpiryInterval = null;
+    }
+
     await closeAIWorker().catch(() => {});
 
     if (io) {
       await new Promise((resolve) => io.close(resolve));
       io = null;
+      server = null;
     } else if (server?.listening) {
       await new Promise((resolve) => server.close(resolve));
+      server = null;
     }
 
     await closeRedis().catch(() => {});
@@ -63,8 +104,17 @@ async function shutdown(signal) {
   console.log(`${signal} received. Closing server...`);
 
   try {
+    // Stop payment expiry scheduler.
+    if (paymentExpiryInterval) {
+      clearInterval(paymentExpiryInterval);
+      paymentExpiryInterval = null;
+    }
+
+    // Close AI BullMQ worker.
+    await closeAIWorker();
+
+    // Close Socket.IO and its attached HTTP server.
     if (io) {
-      // Socket.IO closes its attached HTTP server as well.
       await new Promise((resolve) => io.close(resolve));
       io = null;
       server = null;
@@ -75,14 +125,23 @@ async function shutdown(signal) {
           else resolve();
         });
       });
+
+      server = null;
     }
 
+    // Close Socket.IO Redis publisher and subscriber.
     await closeRedis();
+
+    // Disconnect PostgreSQL.
     await disconnectDatabase();
 
     console.log("[SERVER] Graceful shutdown completed.");
   } catch (error) {
-    console.error("[SERVER] Shutdown failed:", error.message);
+    console.error(
+      "[SERVER] Shutdown failed:",
+      error.message
+    );
+
     process.exitCode = 1;
   }
 }

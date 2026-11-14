@@ -1,3 +1,4 @@
+
 const { prisma } = require("../../../config/database");
 const { createInvoice } = require("../../invoices/services/invoice-creation.service");
 
@@ -37,6 +38,7 @@ const activateSuccessfulPayment = async ({
   paymentId,
   providerPaymentId,
   changedByUserId = null,
+  allowExpiredRecovery = false,
 }) => {
   if (!paymentId || !providerPaymentId) {
     throw createError(
@@ -69,8 +71,8 @@ const activateSuccessfulPayment = async ({
 
       const subscription = payment.subscription;
 
-      // Idempotent handling: a repeated verification or webhook
-      // must not create another invoice or subscription activation.
+      // Idempotency: repeated webhooks must not activate twice
+      // or create duplicate invoices.
       if (payment.status === PaymentStatus.SUCCEEDED) {
         if (payment.providerPaymentId !== providerPaymentId) {
           throw createError(
@@ -105,6 +107,18 @@ const activateSuccessfulPayment = async ({
         };
       }
 
+      // Only CREATED/PENDING payments can normally be activated.
+      // EXPIRED payments are eligible only when explicitly allowed
+      // by the verified captured-payment webhook flow.
+      const allowedPaymentStatuses = [
+        PaymentStatus.CREATED,
+        PaymentStatus.PENDING,
+      ];
+
+      if (allowExpiredRecovery) {
+        allowedPaymentStatuses.push(PaymentStatus.EXPIRED);
+      }
+
       if (
         payment.status === PaymentStatus.REFUNDED ||
         payment.status === PaymentStatus.PARTIALLY_REFUNDED ||
@@ -117,8 +131,7 @@ const activateSuccessfulPayment = async ({
         );
       }
 
-      if (payment.status !== PaymentStatus.CREATED &&
-          payment.status !== PaymentStatus.PENDING) {
+      if (!allowedPaymentStatuses.includes(payment.status)) {
         throw createError(
           "Payment is not in an activatable state.",
           409,
@@ -126,20 +139,30 @@ const activateSuccessfulPayment = async ({
         );
       }
 
-      if (subscription.status !== SubscriptionStatus.PENDING_PAYMENT) {
+      // Only PENDING_PAYMENT subscriptions can normally be activated.
+      // EXPIRED subscriptions are eligible only during verified recovery.
+      const allowedSubscriptionStatuses = [
+        SubscriptionStatus.PENDING_PAYMENT,
+      ];
+
+      if (allowExpiredRecovery) {
+        allowedSubscriptionStatuses.push(SubscriptionStatus.EXPIRED);
+      }
+
+      if (!allowedSubscriptionStatuses.includes(subscription.status)) {
         throw createError(
-          "Subscription is not awaiting payment.",
+          "Subscription is not awaiting payment or eligible for recovery.",
           409,
           "INVALID_SUBSCRIPTION_STATE"
         );
       }
 
+      const previousPaymentStatus = payment.status;
+      const previousSubscriptionStatus = subscription.status;
+
       const durationMonths = subscription.durationMonths;
 
-      if (
-        !Number.isInteger(durationMonths) ||
-        durationMonths <= 0
-      ) {
+      if (!Number.isInteger(durationMonths) || durationMonths <= 0) {
         throw createError(
           "Subscription duration is invalid.",
           500,
@@ -219,12 +242,7 @@ const activateSuccessfulPayment = async ({
       const paymentUpdate = await tx.payment.updateMany({
         where: {
           id: payment.id,
-          status: {
-            in: [
-              PaymentStatus.CREATED,
-              PaymentStatus.PENDING,
-            ],
-          },
+          status: previousPaymentStatus,
         },
         data: {
           status: PaymentStatus.SUCCEEDED,
@@ -241,11 +259,11 @@ const activateSuccessfulPayment = async ({
         );
       }
 
-      // Activate subscription.
+      // Activate subscription, including eligible expired recovery.
       const subscriptionUpdate = await tx.subscription.updateMany({
         where: {
           id: subscription.id,
-          status: SubscriptionStatus.PENDING_PAYMENT,
+          status: previousSubscriptionStatus,
         },
         data: {
           status: SubscriptionStatus.ACTIVE,
@@ -261,18 +279,22 @@ const activateSuccessfulPayment = async ({
           "SUBSCRIPTION_STATE_CONFLICT"
         );
       }
-
-      // Save subscription history.
+    // Save subscription history.
       await tx.subscriptionChange.create({
         data: {
           subscriptionId: subscription.id,
           changeType,
-          previousStatus: SubscriptionStatus.PENDING_PAYMENT,
+          previousStatus: previousSubscriptionStatus,
           newStatus: SubscriptionStatus.ACTIVE,
           changedByUserId,
           details: {
             paymentId: payment.id,
             providerPaymentId,
+            previousPaymentStatus,
+            recoveredFromExpired: (
+              previousPaymentStatus === PaymentStatus.EXPIRED ||
+              previousSubscriptionStatus === SubscriptionStatus.EXPIRED
+            ),
             renewalOfSubscriptionId:
               subscription.renewalOfSubscriptionId || null,
             startsAt: startsAt.toISOString(),
@@ -281,7 +303,7 @@ const activateSuccessfulPayment = async ({
         },
       });
 
-      // Create the invoice inside the same transaction.
+      // Create invoice inside the same transaction.
       const invoice = await createInvoice({
         tx,
         paymentId: payment.id,
@@ -298,6 +320,10 @@ const activateSuccessfulPayment = async ({
         startsAt,
         endsAt,
         renewal: Boolean(subscription.renewalOfSubscriptionId),
+        recoveredFromExpired: (
+          previousPaymentStatus === PaymentStatus.EXPIRED ||
+          previousSubscriptionStatus === SubscriptionStatus.EXPIRED
+        ),
         alreadyActivated: false,
       };
     },
