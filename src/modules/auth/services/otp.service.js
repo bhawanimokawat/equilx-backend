@@ -65,11 +65,30 @@ async function sendPasswordResetEmail(email, token) {
   });
 }
 
+async function sendLoginOtp(email, otp) {
+  const transporter = createMailTransport();
+
+  await transporter.sendMail({
+    from: env.SMTP_FROM,
+    to: email,
+    subject: "Equilx IELTS login verification code",
+    text: `Your Equilx IELTS login verification code is ${otp}. It expires in 5 minutes. If you did not attempt to log in, secure your account.`,
+    html: `
+      <h2>Login verification</h2>
+      <p>Your Equilx IELTS login verification code is:</p>
+      <h1>${otp}</h1>
+      <p>This code expires in 5 minutes.</p>
+      <p>If you did not attempt to log in, secure your account.</p>
+    `,
+  });
+}
+
 
 module.exports = {
   OTP_TTL_MS,
   generateOtp,
   hashOtp,
   sendVerificationOtp,
-  sendPasswordResetEmail
+  sendPasswordResetEmail,
+  sendLoginOtp
 };

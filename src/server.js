@@ -1,29 +1,58 @@
+
 require("dotenv").config();
+
+const http = require("http");
 
 const env = require("./config/env");
 const app = require("./app");
+const { startAIWorker, closeAIWorker,} = require("./modules/ai/workers/ai.worker");
 
 const {
   connectDatabase,
   disconnectDatabase,
 } = require("./config/database");
 
+const { initializeSocket } = require("./config/socket");
+const { closeRedis } = require("./config/redis");
+
 let server;
+let io;
 let shuttingDown = false;
 
 async function startServer() {
   try {
     await connectDatabase();
 
-    server = app.listen(env.PORT, () => {
+    // Start BullMQ AI Worker.
+    startAIWorker();
+
+    // Create one HTTP server for Express and Socket.IO.
+    server = http.createServer(app);
+
+    // Initialize Socket.IO and Redis Adapter.
+    io = await initializeSocket(server);
+
+    server.listen(env.PORT, () => {
       console.log(
         `Equilx IELTS API running on port ${env.PORT} (${env.NODE_ENV})`
       );
     });
   } catch (error) {
-    console.error("Database connection failed:", error.message);
-    process.exitCode = 1;
+    console.error("Server startup failed:", error.message);
+
+    await closeAIWorker().catch(() => {});
+
+    if (io) {
+      await new Promise((resolve) => io.close(resolve));
+      io = null;
+    } else if (server?.listening) {
+      await new Promise((resolve) => server.close(resolve));
+    }
+
+    await closeRedis().catch(() => {});
     await disconnectDatabase().catch(() => {});
+
+    process.exitCode = 1;
   }
 }
 
@@ -33,22 +62,28 @@ async function shutdown(signal) {
 
   console.log(`${signal} received. Closing server...`);
 
-  if (server) {
-    server.close(async (error) => {
-      try {
-        await disconnectDatabase();
+  try {
+    if (io) {
+      // Socket.IO closes its attached HTTP server as well.
+      await new Promise((resolve) => io.close(resolve));
+      io = null;
+      server = null;
+    } else if (server?.listening) {
+      await new Promise((resolve, reject) => {
+        server.close((error) => {
+          if (error) reject(error);
+          else resolve();
+        });
+      });
+    }
 
-        if (error) {
-          console.error("HTTP server shutdown failed:", error.message);
-          process.exitCode = 1;
-        }
-      } catch (dbError) {
-        console.error("Database shutdown failed:", dbError.message);
-        process.exitCode = 1;
-      }
-    });
-  } else {
-    await disconnectDatabase().catch(() => {});
+    await closeRedis();
+    await disconnectDatabase();
+
+    console.log("[SERVER] Graceful shutdown completed.");
+  } catch (error) {
+    console.error("[SERVER] Shutdown failed:", error.message);
+    process.exitCode = 1;
   }
 }
 

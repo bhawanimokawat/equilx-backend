@@ -6,12 +6,8 @@ const cookieParser = require("cookie-parser");
 
 const env = require("./config/env");
 const authRoutes = require("./modules/auth/routes/auth.routes");
-const { apiLimiter } = require("./middleware/rate-limit.middleware");
-const {
-  notFoundHandler,
-  errorHandler,
-} = require("./middleware/error.middleware");
-
+const { apiLimiter,} = require("./middleware/rate-limit.middleware");
+const {  notFoundHandler,  errorHandler,} = require("./middleware/error.middleware");
 const userRoutes = require("./modules/users/routes/user.routes");
 const organizationRoutes = require("./modules/organizations/routes/organization.routes");
 const membershipRoutes = require("./modules/memberships/routes/membership.routes");
@@ -23,16 +19,17 @@ const attemptRoutes = require("./modules/attempts/routes/attempt.routes");
 const mockRoutes = require("./modules/mock/routes/mock.routes");
 const practiceRoutes = require("./modules/practice/routes/practice.routes");
 const resultRoutes = require("./modules/results/routes/result.routes");
-
-// Existing marketing module
-const marketingRoutes = require("./modules/marketing/routes/marketing.routes");
-
-// New billing and payment modules
-const paymentRoutes = require("./modules/payments/routes/payment.routes");
+const paymentRoutes =  require("./modules/payments/routes/payment.routes");
 const paymentController = require("./modules/payments/controllers/payment.controller");
 const subscriptionRoutes = require("./modules/subscriptions/routes/subscription.routes");
 const planRoutes = require("./modules/plans/routes/plan.routes");
 const invoiceRoutes = require("./modules/invoices/routes/invoice.routes");
+const assignmentRoutes = require("./modules/assignments/routes/assignment.routes");
+const batchRoutes = require("./modules/batches/routes/batch.routes");
+const chatRoutes = require("./modules/chat/routes/chat.routes");
+const writingRoutes = require("./modules/writing/routes/writing.routes");
+const speakingRoutes = require("./modules/speaking/routes/speaking.routes");
+const studentInvitationAcceptanceRoutes = require("./modules/memberships/routes/student-invitation-acceptance.routes");
 
 const app = express();
 
@@ -80,7 +77,6 @@ app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/users", userRoutes);
 app.use("/api/v1/organizations", organizationRoutes);
 app.use("/api/v1/institutes", membershipRoutes);
-
 app.use("/api/v1/institutes/:instituteId/crm", crmRoutes);
 app.use("/api/v1/cms", cmsRoutes);
 
@@ -88,17 +84,14 @@ app.use("/api/v1/attempts", attemptRoutes);
 app.use("/api/v1/mock", mockRoutes);
 app.use("/api/v1/practice", practiceRoutes);
 app.use("/api/v1/results", resultRoutes);
-
-// Existing marketing routes
-app.use("/api/v1/marketing", marketingRoutes);
-
-// New payment and billing routes
-app.use("/api/v1/payments", paymentRoutes);
+app.use("/api/v1/payments",paymentRoutes);
 app.use("/api/v1/subscriptions", subscriptionRoutes);
 app.use("/api/v1/plans", planRoutes);
 app.use("/api/v1/invoices", invoiceRoutes);
 
-// Health check
+
+
+// Health check.
 app.get("/api/v1/health", (req, res) => {
   res.status(200).json({
     success: true,

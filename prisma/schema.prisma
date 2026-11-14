@@ -104,6 +104,7 @@ model User {
 
   createdBatches   Batch[]       @relation("BatchCreator")
   batchMemberships BatchMember[]
+  batchesAssigned  Batch[]       @relation("BatchTrainer")
 
   trainerAssignments    TrainerStudent[] @relation("TrainerAssignmentTrainer")
   studentAssignments    TrainerStudent[] @relation("TrainerAssignmentStudent")
@@ -262,18 +263,26 @@ model InstituteMembership {
 }
 
 model MembershipInvitation {
-  id              String           @id @default(uuid()) @db.Uuid
-  instituteId     String           @db.Uuid
-  invitedByUserId String           @db.Uuid
-  invitedUserId   String?          @db.Uuid
-  inviteeEmail    String
-  status          InvitationStatus @default(PENDING)
-  expiresAt       DateTime
-  acceptedAt      DateTime?
-  reviewedById    String?          @db.Uuid
-  reviewedAt      DateTime?
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  id              String  @id @default(uuid()) @db.Uuid
+  instituteId     String  @db.Uuid
+  invitedByUserId String  @db.Uuid
+  invitedUserId   String? @db.Uuid
+
+  inviteeEmail String
+  inviteeName  String? @db.VarChar(120)
+  inviteePhone String? @db.VarChar(20)
+
+  tokenHash        String  @unique
+  approvalRequired Boolean @default(false)
+
+  status       InvitationStatus @default(PENDING)
+  expiresAt    DateTime
+  acceptedAt   DateTime?
+  reviewedById String?          @db.Uuid
+  reviewedAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   institute   Institute @relation(fields: [instituteId], references: [id], onDelete: Restrict)
   invitedBy   User      @relation("InvitationSender", fields: [invitedByUserId], references: [id], onDelete: Restrict)
@@ -290,16 +299,21 @@ model Batch {
   instituteId String   @db.Uuid
   name        String
   createdById String   @db.Uuid
+  trainerId   String?  @db.Uuid
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   institute         Institute               @relation(fields: [instituteId], references: [id], onDelete: Restrict)
   createdBy         User                    @relation("BatchCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  trainer           User?                   @relation("BatchTrainer", fields: [trainerId], references: [id], onDelete: Restrict)
   members           BatchMember[]
   assignmentTargets AssignmentBatchTarget[]
 
+  conversations Conversation[]
+
   @@unique([instituteId, name])
   @@index([instituteId, createdAt])
+  @@index([trainerId])
 }
 
 model BatchMember {
@@ -946,8 +960,8 @@ model WritingSubmission {
   attempt     Attempt             @relation(fields: [attemptId], references: [id], onDelete: Restrict)
   evaluations WritingEvaluation[]
 
+  @@unique([attemptId, taskNumber])
   @@index([userId, submittedAt])
-  @@index([attemptId, taskNumber])
 }
 
 model WritingEvaluation {
@@ -1026,6 +1040,7 @@ model SpeakingRecording {
   mimeType        String
   durationSeconds Int?
   fileSizeBytes   BigInt?
+  checksum        String?
   consentStatus   RecordingConsentStatus
   recordedAt      DateTime?
   deleteAfter     DateTime?
@@ -1035,6 +1050,7 @@ model SpeakingRecording {
   submission SpeakingSubmission @relation(fields: [submissionId], references: [id], onDelete: Restrict)
 
   @@index([submissionId, createdAt])
+  @@index([submissionId, checksum, deletedAt])
   @@index([deleteAfter, deletedAt])
 }
 
@@ -1311,6 +1327,7 @@ enum DeliveryStatus {
 model Conversation {
   id          String             @id @default(uuid()) @db.Uuid
   instituteId String             @db.Uuid
+  batchId     String?            @db.Uuid
   type        ConversationType
   status      ConversationStatus @default(ACTIVE)
   title       String?
@@ -1319,10 +1336,12 @@ model Conversation {
   updatedAt   DateTime           @updatedAt
 
   institute    Institute                 @relation(fields: [instituteId], references: [id], onDelete: Restrict)
+  batch        Batch?                    @relation(fields: [batchId], references: [id], onDelete: Restrict)
   participants ConversationParticipant[]
   messages     Message[]
 
   @@index([instituteId, status, updatedAt])
+  @@index([batchId])
 }
 
 model ConversationParticipant {
