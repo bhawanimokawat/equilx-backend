@@ -1,0 +1,101 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Equilx Razorpay Test</title>
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+</head>
+<body>
+  <h2>Equilx Student Pro - Test Payment</h2>
+  <button id="payBtn">Pay ₹1500</button>
+  <pre id="result"></pre>
+
+  <script>
+    const API = "http://localhost:5000/api/v1";
+
+    // Paste your student access token here.
+    const ACCESS_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIwYzYxNjlkNy00ZTc5LTRhNzgtYTM5Yy02YWQzNmMxMTk4NWIiLCJyb2xlIjoiVVNFUiIsImlhdCI6MTc5NDQ3NTk1NywiZXhwIjoxNzk0NDc5NTU3LCJhdWQiOiJlcXVpbHgtaWVsdHMtY2xpZW50IiwiaXNzIjoiZXF1aWx4LWllbHRzLWFwaSJ9.3p6cPyjor4U3hux_BcxF89KjcILGJGi2tNOkM0LtSjo";
+
+    const result = document.getElementById("result");
+
+    document.getElementById("payBtn").onclick = async () => {
+      try {
+        result.textContent = "Creating order...";
+
+        const orderResponse = await fetch(`${API}/payments/orders`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${ACCESS_TOKEN}`,
+            "Idempotency-Key": `student-pro-test-${Date.now()}`
+          },
+          body: JSON.stringify({
+            planVersionId: "d5415b20-fe4d-47d8-8cf7-d300c3d798ef"
+          })
+        });
+
+        const orderData = await orderResponse.json();
+
+        if (!orderResponse.ok) {
+          throw new Error(JSON.stringify(orderData));
+        }
+
+        const order = orderData.data;
+
+        const options = {
+          key: order.keyId,
+          amount: Math.round(Number(order.amount) * 100),
+          currency: order.currency,
+          name: "Equilx IELTS",
+          description: "Student Pro Subscription",
+          order_id: order.orderId,
+
+          handler: async function (response) {
+            result.textContent = "Verifying payment...";
+
+            const verifyResponse = await fetch(`${API}/payments/verify`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${ACCESS_TOKEN}`
+              },
+              body: JSON.stringify({
+                paymentId: order.paymentId,
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_signature: response.razorpay_signature
+              })
+            });
+
+            const verifyData = await verifyResponse.json();
+            result.textContent = JSON.stringify(verifyData, null, 2);
+          },
+
+          modal: {
+            ondismiss: function () {
+              result.textContent = "Checkout closed. Payment status not confirmed.";
+            }
+          },
+
+          theme: {
+            color: "#2563eb"
+          }
+        };
+
+        const checkout = new Razorpay(options);
+
+        checkout.on("payment.failed", function (response) {
+          result.textContent = JSON.stringify(response.error, null, 2);
+        });
+
+        checkout.open();
+
+      } catch (error) {
+        result.textContent = error.message;
+      }
+    };
+  </script>
+</body>
+</html>

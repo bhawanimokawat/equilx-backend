@@ -17,7 +17,7 @@ const billingConfig = Object.freeze({
     state: getEnv("BILLING_SELLER_STATE"),
     stateCode: getEnv("BILLING_SELLER_STATE_CODE"),
     postalCode: getEnv("BILLING_SELLER_POSTAL_CODE"),
-    country: getEnv("BILLING_SELLER_COUNTRY", "India"),
+    country: getEnv("BILLING_SELLER_COUNTRY", "IN"),
   }),
 
   tax: Object.freeze({

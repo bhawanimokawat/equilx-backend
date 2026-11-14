@@ -254,7 +254,7 @@ test("CRM service unit tests", async (t) => {
 
     await assert.rejects(
       crmService.updateLead(adminScope, LEAD_ID, {
-        status: "CONVERTED",
+        status: "ENROLLED",
       }),
       (error) => error.code === "LEAD_CONVERSION_REQUIRED"
     );

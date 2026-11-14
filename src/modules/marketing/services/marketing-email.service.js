@@ -289,22 +289,18 @@ async function processPromotionalEmails() {
     const user = preference.user;
 
     // Skip missing users.
-    if (!user) continue;
+    if (!user) {
+  console.log("[Marketing] Skipped: User not found");
+  continue;
+}
 
-    // Stop marketing emails for active Student Pro users.
-    if (user.subscriptions.length > 0) {
-      await prisma.notificationPreference.update({
-        where: {
-          userId: user.id,
-        },
+console.log("[Marketing] User ID:", user.id);
+console.log("[Marketing] Student Pro subscriptions:", user.subscriptions);
 
-        data: {
-          marketingEmailEnabled: false,
-        },
-      });
-
-      continue;
-    }
+if (user.subscriptions.length > 0) {
+  console.log("[Marketing] Skipped: Student Pro is active");
+  continue;
+}
 
     try {
       // Send promotional email.
