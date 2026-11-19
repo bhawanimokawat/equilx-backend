@@ -43,8 +43,10 @@ const {
 const app = express();
 
 app.disable("x-powered-by");
+
 app.use(helmet());
 
+// CORS Configuration
 const allowedOrigins = env.FRONTEND_URL
   .split(",")
   .map((url) => url.trim().replace(/\/+$/, ""));
@@ -89,7 +91,21 @@ app.get("/api/v1/health", (req, res) => {
   });
 });
 
-// API routes
+// ========================================
+// PUBLIC HEALTH CHECK
+// No authentication required
+// ========================================
+app.get("/api/v1/health", (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: "Equilx IELTS API is running",
+  });
+});
+
+// ========================================
+// API ROUTES
+// ========================================
+
 app.use("/api/v1/docs", docsRoutes);
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/users", userRoutes);
@@ -115,10 +131,17 @@ app.use("/api/v1/invoices", invoiceRoutes);
 app.use("/api/v1", assignmentRoutes);
 app.use("/api/v1", batchRoutes);
 app.use("/api/v1", chatRoutes);
+
 app.use("/api/v1/writing", writingRoutes);
 app.use("/api/v1/speaking", speakingRoutes);
 
-
+// Health check
+app.get("/api/v1/health", (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: "Equilx IELTS API is running",
+  });
+});
 
 // Error handling
 app.use(notFoundHandler);
