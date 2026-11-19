@@ -4,6 +4,14 @@ const { randomUUID } = require("node:crypto");
 
 const { prisma } = require("../../../config/database");
 const { OTP_TTL_MS, generateOtp, hashOtp, sendVerificationOtp, sendPasswordResetEmail, } = require("./otp.service");
+const {
+  requiresLoginTwoFactor,
+  createLoginChallenge,
+} = require("./two-factor.service");
+
+const {
+  createAuthenticatedSession,
+} = require("./session.service");
 
 const { hashToken, createAccessToken, createRefreshToken, getRefreshExpiry, } = require("./token.service");
 
@@ -140,52 +148,61 @@ async function login({ email, password }) {
       email: true,
       passwordHash: true,
       platformRole: true,
+      tokenVersion: true,
       emailVerifiedAt: true,
       isActive: true,
       createdAt: true,
       profile: {
-        select: { name: true, phone: true, avatarUrl: true },
+        select: {
+          name: true,
+          phone: true,
+          avatarUrl: true,
+        },
+      },
+      memberships: {
+        where: { status: "ACTIVE" },
+        select: {
+          role: true,
+          status: true,
+        },
       },
     },
   });
 
-  // Use the same error for unknown emails and incorrect passwords.
-  const passwordMatches =
-    user?.passwordHash
-      ? await bcrypt.compare(password, user.passwordHash)
-      : false;
+  if (!user || !user.passwordHash) {
+    throw createError("Invalid email or password.", 401);
+  }
 
-  if (!user || !passwordMatches) {
-    throw createError("Invalid email or password.", 401, "INVALID_CREDENTIALS");
+  const isPasswordValid = await bcrypt.compare(
+    password,
+    user.passwordHash
+  );
+
+  if (!isPasswordValid) {
+    throw createError("Invalid email or password.", 401);
   }
 
   if (!user.isActive) {
-    throw createError("This account is unavailable.", 403, "ACCOUNT_INACTIVE");
+    throw createError("This account is inactive.", 403);
   }
 
   if (!user.emailVerifiedAt) {
-    throw createError("Please verify your email before logging in.", 403, "EMAIL_NOT_VERIFIED");
+    throw createError("Please verify your email before logging in.", 403);
   }
 
-  const refreshToken = createRefreshToken();
-  const familyId = randomUUID();
+  // Staff accounts must complete email OTP verification.
+  if (requiresLoginTwoFactor(user)) {
+    const challenge = await createLoginChallenge(user);
 
-  await prisma.refreshToken.create({
-    data: {
-      userId: user.id,
-      familyId,
-      tokenHash: hashToken(refreshToken),
-      expiresAt: getRefreshExpiry(),
-    },
-  });
+    return {
+      twoFactorRequired: true,
+      ...challenge,
+    };
+  }
+  console.log("LOGIN TOKEN VERSION:", user.tokenVersion);
 
-  const { passwordHash, isActive, ...safeUser } = user;
-
-  return {
-    accessToken: createAccessToken(user),
-    refreshToken,
-    user: safeUser,
-  };
+  // Students and other accounts without mandatory 2FA.
+  return createAuthenticatedSession(user);
 }
 
 async function refreshSession(rawRefreshToken) {
@@ -206,6 +223,7 @@ async function refreshSession(rawRefreshToken) {
             id: true,
             email: true,
             platformRole: true,
+            tokenVersion: true,
             emailVerifiedAt: true,
             isActive: true,
             createdAt: true,
@@ -352,7 +370,7 @@ async function resetPassword({ token, newPassword }) {
 
     await tx.user.update({
       where: { id: record.userId },
-      data: { passwordHash },
+      data: { passwordHash,tokenVersion: { increment: 1 }, },
     });
 
     await tx.refreshToken.updateMany({
@@ -396,10 +414,9 @@ async function changePassword({ userId, currentPassword, newPassword }) {
 
   await prisma.$transaction(async (tx) => {
     await tx.user.update({
-      where: { id: userId },
-      data: { passwordHash },
-    });
-
+  where: { id: userId },
+  data: { passwordHash,tokenVersion: { increment: 1 }, },
+});
     await tx.refreshToken.updateMany({
       where: { userId, revokedAt: null },
       data: { revokedAt: now },

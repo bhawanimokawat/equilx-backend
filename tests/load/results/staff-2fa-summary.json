@@ -1,0 +1,293 @@
+{
+  "root_group": {
+    "name": "",
+    "path": "",
+    "id": "d41d8cd98f00b204e9800998ecf8427e",
+    "groups": [],
+    "checks": [
+      {
+        "name": "staff login returns 202",
+        "path": "::staff login returns 202",
+        "id": "9b3680cfc2f5a5df7bb8b5d3549fcce7",
+        "passes": 1,
+        "fails": 0
+      },
+      {
+        "passes": 1,
+        "fails": 0,
+        "name": "2FA is required",
+        "path": "::2FA is required",
+        "id": "75e409d28311fc55b036e21ca119c4f5"
+      },
+      {
+        "id": "4c05e198783a479b8ada0cfcb3517a7c",
+        "passes": 1,
+        "fails": 0,
+        "name": "challenge ID received",
+        "path": "::challenge ID received"
+      },
+      {
+        "name": "access token not issued before OTP",
+        "path": "::access token not issued before OTP",
+        "id": "8adae08c54b28596662074faef9a035d",
+        "passes": 1,
+        "fails": 0
+      },
+      {
+        "name": "Mailpit inbox returns 200",
+        "path": "::Mailpit inbox returns 200",
+        "id": "f468dd1b09f888a24f1b2873798792ef",
+        "passes": 1,
+        "fails": 0
+      },
+      {
+        "id": "5d60a8442a5795f76f050963175a1139",
+        "passes": 1,
+        "fails": 0,
+        "name": "staff login OTP email found",
+        "path": "::staff login OTP email found"
+      },
+      {
+        "passes": 1,
+        "fails": 0,
+        "name": "six-digit staff OTP extracted",
+        "path": "::six-digit staff OTP extracted",
+        "id": "8d41dfe1c9711fd67d75ddc8f9fb914b"
+      },
+      {
+        "name": "staff OTP verification returns 200",
+        "path": "::staff OTP verification returns 200",
+        "id": "a223a9209c3459d3a6ea069c19c6e839",
+        "passes": 1,
+        "fails": 0
+      },
+      {
+        "name": "staff login succeeds",
+        "path": "::staff login succeeds",
+        "id": "77252e5b359ba49fcebbc253615e29a4",
+        "passes": 1,
+        "fails": 0
+      },
+      {
+        "path": "::access token issued after OTP",
+        "id": "8575eb83f38e9db8ab7945538a4b992c",
+        "passes": 1,
+        "fails": 0,
+        "name": "access token issued after OTP"
+      },
+      {
+        "fails": 0,
+        "name": "refresh cookie issued after OTP",
+        "path": "::refresh cookie issued after OTP",
+        "id": "d5246ec0db5311c24f34fa50652f3043",
+        "passes": 1
+      },
+      {
+        "id": "9b16b43d2e170978ea7c674e393cf219",
+        "passes": 1,
+        "fails": 0,
+        "name": "authenticated staff profile returns 200",
+        "path": "::authenticated staff profile returns 200"
+      },
+      {
+        "name": "authenticated profile succeeds",
+        "path": "::authenticated profile succeeds",
+        "id": "42510f247cc77cf8fa83433b5d375ac0",
+        "passes": 1,
+        "fails": 0
+      }
+    ]
+  },
+  "options": {
+    "summaryTimeUnit": "",
+    "noColor": false,
+    "summaryTrendStats": [
+      "avg",
+      "min",
+      "med",
+      "max",
+      "p(90)",
+      "p(95)"
+    ]
+  },
+  "state": {
+    "isStdOutTTY": true,
+    "isStdErrTTY": true,
+    "testRunDurationMs": 488.0492
+  },
+  "metrics": {
+    "iteration_duration": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "avg": 488.0492,
+        "min": 488.0492,
+        "med": 488.0492,
+        "max": 488.0492,
+        "p(90)": 488.0492,
+        "p(95)": 488.0492
+      }
+    },
+    "http_reqs": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "rate": 8.195895004028282,
+        "count": 4
+      }
+    },
+    "http_req_connecting": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "p(90)": 1.8592100000000003,
+        "p(95)": 1.935755,
+        "avg": 0.8785750000000001,
+        "min": 0,
+        "med": 0.751,
+        "max": 2.0123
+      }
+    },
+    "http_req_waiting": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "p(95)": 376.50499499999984,
+        "avg": 116.233125,
+        "min": 3.7375,
+        "med": 10.015899999999998,
+        "max": 441.1632,
+        "p(90)": 311.8467900000001
+      }
+    },
+    "http_req_sending": {
+      "contains": "time",
+      "values": {
+        "avg": 0,
+        "min": 0,
+        "med": 0,
+        "max": 0,
+        "p(90)": 0,
+        "p(95)": 0
+      },
+      "type": "trend"
+    },
+    "http_req_duration": {
+      "values": {
+        "min": 3.7375,
+        "med": 10.39855,
+        "max": 444.1653,
+        "p(90)": 314.1778500000001,
+        "p(95)": 379.17157499999985,
+        "avg": 117.174975
+      },
+      "thresholds": {
+        "p(95)<3000": {
+          "ok": true
+        }
+      },
+      "type": "trend",
+      "contains": "time"
+    },
+    "http_req_tls_handshaking": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "avg": 0,
+        "min": 0,
+        "med": 0,
+        "max": 0,
+        "p(90)": 0,
+        "p(95)": 0
+      }
+    },
+    "http_req_failed": {
+      "type": "rate",
+      "contains": "default",
+      "values": {
+        "rate": 0,
+        "passes": 0,
+        "fails": 4
+      },
+      "thresholds": {
+        "rate<0.01": {
+          "ok": true
+        }
+      }
+    },
+    "http_req_blocked": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "med": 1.2643,
+        "max": 14.1507,
+        "p(90)": 10.664070000000002,
+        "p(95)": 12.407384999999994,
+        "avg": 4.169825,
+        "min": 0
+      }
+    },
+    "data_received": {
+      "type": "counter",
+      "contains": "data",
+      "values": {
+        "count": 9439,
+        "rate": 19340.263235755738
+      }
+    },
+    "http_req_duration{expected_response:true}": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "med": 10.39855,
+        "max": 444.1653,
+        "p(90)": 314.1778500000001,
+        "p(95)": 379.17157499999985,
+        "avg": 117.174975,
+        "min": 3.7375
+      }
+    },
+    "http_req_receiving": {
+      "contains": "time",
+      "values": {
+        "avg": 0.94185,
+        "min": 0,
+        "med": 0.38265,
+        "max": 3.0021,
+        "p(90)": 2.3310600000000004,
+        "p(95)": 2.6665799999999993
+      },
+      "type": "trend"
+    },
+    "checks": {
+      "type": "rate",
+      "contains": "default",
+      "values": {
+        "rate": 1,
+        "passes": 13,
+        "fails": 0
+      },
+      "thresholds": {
+        "rate>0.99": {
+          "ok": true
+        }
+      }
+    },
+    "iterations": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 1,
+        "rate": 2.0489737510070705
+      }
+    },
+    "data_sent": {
+      "type": "counter",
+      "contains": "data",
+      "values": {
+        "count": 998,
+        "rate": 2044.8758035050564
+      }
+    }
+  }
+}

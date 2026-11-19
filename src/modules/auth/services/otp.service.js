@@ -25,15 +25,18 @@ function createMailTransport() {
     host: env.SMTP_HOST,
     port: Number(env.SMTP_PORT),
     secure: Number(env.SMTP_PORT) === 465,
-    auth: {
-      user: env.SMTP_USER,
-      pass: env.SMTP_PASS,
-    },
+    auth: env.NODE_ENV === "test"
+      ? undefined
+      : {
+        user: env.SMTP_USER,
+        pass: env.SMTP_PASS,
+      },
   });
 }
 
 async function sendVerificationOtp(email, otp) {
   const transporter = createMailTransport();
+  
 
   await transporter.sendMail({
     from: env.SMTP_FROM || env.SMTP_USER,

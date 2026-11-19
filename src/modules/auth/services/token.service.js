@@ -14,6 +14,7 @@ function createAccessToken(user) {
     {
       sub: user.id,
       role: user.platformRole,
+      tokenVersion: user.tokenVersion,
     },
     env.ACCESS_TOKEN_SECRET,
     {

@@ -148,6 +148,7 @@ async function login({ email, password }) {
       email: true,
       passwordHash: true,
       platformRole: true,
+      tokenVersion: true,
       emailVerifiedAt: true,
       isActive: true,
       createdAt: true,
@@ -198,6 +199,7 @@ async function login({ email, password }) {
       ...challenge,
     };
   }
+  console.log("LOGIN TOKEN VERSION:", user.tokenVersion);
 
   // Students and other accounts without mandatory 2FA.
   return createAuthenticatedSession(user);
@@ -221,11 +223,19 @@ async function refreshSession(rawRefreshToken) {
             id: true,
             email: true,
             platformRole: true,
+            tokenVersion: true,
             emailVerifiedAt: true,
             isActive: true,
             createdAt: true,
             profile: {
               select: { name: true, phone: true, avatarUrl: true },
+            },
+            memberships: {
+              where: { status: "ACTIVE" },
+              select: {
+                role: true,
+                status: true,
+              },
             },
           },
         },
@@ -367,7 +377,7 @@ async function resetPassword({ token, newPassword }) {
 
     await tx.user.update({
       where: { id: record.userId },
-      data: { passwordHash },
+      data: { passwordHash, tokenVersion: { increment: 1 }, },
     });
 
     await tx.refreshToken.updateMany({
@@ -412,9 +422,8 @@ async function changePassword({ userId, currentPassword, newPassword }) {
   await prisma.$transaction(async (tx) => {
     await tx.user.update({
       where: { id: userId },
-      data: { passwordHash },
+      data: { passwordHash, tokenVersion: { increment: 1 }, },
     });
-
     await tx.refreshToken.updateMany({
       where: { userId, revokedAt: null },
       data: { revokedAt: now },

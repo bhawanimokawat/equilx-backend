@@ -59,6 +59,13 @@ async function createLoginChallenge(user) {
   });
 
   try {
+    if (process.env.NODE_ENV !== "production") {
+      console.log("\n========== DEVELOPMENT LOGIN OTP ==========");
+      console.log(`Email: ${user.email}`);
+      console.log(`OTP: ${otp}`);
+      console.log("===========================================\n");
+    }
+
     await sendLoginOtp(user.email, otp);
   } catch (error) {
     await prisma.twoFactorChallenge.updateMany({
@@ -105,6 +112,7 @@ async function verifyLoginChallenge({ challengeId, otp }) {
           id: true,
           email: true,
           platformRole: true,
+          tokenVersion: true,
           emailVerifiedAt: true,
           isActive: true,
           createdAt: true,

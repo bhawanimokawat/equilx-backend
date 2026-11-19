@@ -1,4 +1,3 @@
-
 const express = require("express");
 const helmet = require("helmet");
 const cors = require("cors");
@@ -81,6 +80,15 @@ app.use(express.json({ limit: "100kb" }));
 app.use(express.urlencoded({ extended: false, limit: "20kb" }));
 app.use(cookieParser());
 
+
+// Health check
+app.get("/api/v1/health", (req, res) => {
+  res.status(200).json({
+    success: true,
+    message: "Equilx IELTS API is running",
+  });
+});
+
 // API routes
 app.use("/api/v1/docs", docsRoutes);
 app.use("/api/v1/auth", authRoutes);
@@ -110,13 +118,7 @@ app.use("/api/v1", chatRoutes);
 app.use("/api/v1/writing", writingRoutes);
 app.use("/api/v1/speaking", speakingRoutes);
 
-// Health check
-app.get("/api/v1/health", (req, res) => {
-  res.status(200).json({
-    success: true,
-    message: "Equilx IELTS API is running",
-  });
-});
+
 
 // Error handling
 app.use(notFoundHandler);

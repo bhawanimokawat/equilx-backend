@@ -38,12 +38,17 @@ async function authenticateChatSocket(socket, next) {
         platformRole: true,
         emailVerifiedAt: true,
         isActive: true,
+        tokenVersion: true,
       },
     });
 
     if (!user || !user.isActive || !user.emailVerifiedAt) {
       return next(new Error("Account unavailable."));
     }
+
+    if (payload.tokenVersion !== user.tokenVersion) {
+  throw new Error("Invalid or expired access token.");
+}
 
     // Never accept the user ID from the client.
     socket.data.user = {

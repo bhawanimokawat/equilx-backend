@@ -2,16 +2,16 @@ const bcrypt = require("bcryptjs");
 
 const { registerSchema, verifyEmailSchema, resendOtpSchema, loginSchema, forgotPasswordSchema, resetPasswordSchema, changePasswordSchema } = require("../validation/auth.validation");
 const { registerUser } = require("../services/email-verification.service");
-const authService = require("../services/auths.service");
+const authService = require("../services/auth.service");
 
-const { REFRESH_COOKIE_NAME, setRefreshCookie, clearRefreshCookie,} = require("../services/token.service");
+const { REFRESH_COOKIE_NAME, setRefreshCookie, clearRefreshCookie, } = require("../services/token.service");
 const { verifyLoginOtpSchema } = require("../validation/two-factor.validation");
 const { verifyLoginChallenge } = require("../services/two-factor.service");
 const { createAuthenticatedSession } = require("../services/session.service");
 const { googleLoginSchema } = require("../validation/google-auth.validation");
 const { authenticateWithGoogle } = require("../services/google-auth.service");
 const { requiresLoginTwoFactor, createLoginChallenge } = require("../services/two-factor.service");
- 
+
 
 async function register(req, res, next) {
   try {
@@ -282,6 +282,7 @@ async function me(req, res) {
     emailVerifiedAt,
     createdAt,
     profile,
+    memberships,
   } = req.user;
 
   return res.status(200).json({
@@ -294,6 +295,7 @@ async function me(req, res) {
         emailVerified: Boolean(emailVerifiedAt),
         createdAt,
         profile,
+        memberships: memberships || [],
       },
     },
   });
@@ -314,6 +316,7 @@ async function verifyLoginOtp(req, res, next) {
     }
 
     const { challengeId, otp } = parsed.data;
+    
 
     // Verify and consume the OTP challenge.
     const result = await verifyLoginChallenge({

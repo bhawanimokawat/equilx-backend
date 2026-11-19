@@ -2,12 +2,21 @@ const { OAuth2Client } = require("google-auth-library");
 const { prisma } = require("../../../config/database");
 const env = require("../../../config/env");
 
+function createError(message, statusCode, code) {
+  const error = new Error(message);
+  error.statusCode = statusCode;
+  error.code = code;
+  return error;
+}
+
 const googleClient = new OAuth2Client(env.GOOGLE_CLIENT_ID);
+
 
 const googleUserSelect = {
   id: true,
   email: true,
   platformRole: true,
+  tokenVersion: true,
   emailVerifiedAt: true,
   isActive: true,
   createdAt: true,

@@ -48,11 +48,19 @@ async function requireAuth(req, res, next) {
         emailVerifiedAt: true,
         isActive: true,
         createdAt: true,
+        tokenVersion: true,
         profile: {
           select: {
             name: true,
             phone: true,
             avatarUrl: true,
+          },
+        },
+        memberships: {
+          where: { status: "ACTIVE" },
+          select: {
+            role: true,
+            status: true,
           },
         },
       },
@@ -64,6 +72,16 @@ async function requireAuth(req, res, next) {
         error: {
           code: "ACCOUNT_UNAVAILABLE",
           message: "Your account is unavailable. Please log in again.",
+        },
+      });
+    }
+
+    if (payload.tokenVersion !== user.tokenVersion) {
+      return res.status(401).json({
+        success: false,
+        error: {
+          code: "INVALID_ACCESS_TOKEN",
+          message: "Your session has expired. Please log in again.",
         },
       });
     }

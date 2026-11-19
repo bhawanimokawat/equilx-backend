@@ -1,0 +1,37 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Equilx Google Login Test</title>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+    <h2>Equilx Google Login Test</h2>
+
+    <div id="googleButton"></div>
+
+    <script>
+        function handleGoogleLogin(response) {
+            console.log("GOOGLE ID TOKEN:");
+            console.log(response.credential);
+            alert("Google ID token generated! Open browser console (F12).");
+        }
+
+        window.onload = function () {
+            google.accounts.id.initialize({
+                client_id:"368556558994-5got867cvennbe9769rshe4b06f8qp83.apps.googleusercontent.com",
+                callback: handleGoogleLogin
+            });
+
+            google.accounts.id.renderButton(
+                document.getElementById("googleButton"),
+                {
+                    theme: "outline",
+                    size: "large",
+                    text: "signin_with"
+                }
+            );
+        };
+    </script>
+</body>
+</html>

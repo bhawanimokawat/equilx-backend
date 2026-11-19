@@ -1,0 +1,244 @@
+{
+  "metrics": {
+    "http_req_duration{expected_response:true}": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "avg": 10.7499,
+        "min": 10.7499,
+        "med": 10.7499,
+        "max": 10.7499,
+        "p(90)": 10.7499,
+        "p(95)": 10.7499
+      }
+    },
+    "http_req_blocked": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "p(95)": 11.1065,
+        "avg": 11.1065,
+        "min": 11.1065,
+        "med": 11.1065,
+        "max": 11.1065,
+        "p(90)": 11.1065
+      }
+    },
+    "http_req_connecting": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "avg": 1.1808,
+        "min": 1.1808,
+        "med": 1.1808,
+        "max": 1.1808,
+        "p(90)": 1.1808,
+        "p(95)": 1.1808
+      }
+    },
+    "http_req_sending": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "med": 0,
+        "max": 0,
+        "p(90)": 0,
+        "p(95)": 0,
+        "avg": 0,
+        "min": 0
+      }
+    },
+    "checks": {
+      "type": "rate",
+      "contains": "default",
+      "values": {
+        "rate": 1,
+        "passes": 6,
+        "fails": 0
+      },
+      "thresholds": {
+        "rate>0.99": {
+          "ok": true
+        }
+      }
+    },
+    "http_req_duration": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "avg": 10.7499,
+        "min": 10.7499,
+        "med": 10.7499,
+        "max": 10.7499,
+        "p(90)": 10.7499,
+        "p(95)": 10.7499
+      },
+      "thresholds": {
+        "p(95)<3000": {
+          "ok": true
+        }
+      }
+    },
+    "http_req_failed": {
+      "values": {
+        "passes": 0,
+        "fails": 1,
+        "rate": 0
+      },
+      "thresholds": {
+        "rate<0.01": {
+          "ok": true
+        }
+      },
+      "type": "rate",
+      "contains": "default"
+    },
+    "http_req_receiving": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "min": 0.7237,
+        "med": 0.7237,
+        "max": 0.7237,
+        "p(90)": 0.7237,
+        "p(95)": 0.7237,
+        "avg": 0.7237
+      }
+    },
+    "http_req_tls_handshaking": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "p(95)": 0,
+        "avg": 0,
+        "min": 0,
+        "med": 0,
+        "max": 0,
+        "p(90)": 0
+      }
+    },
+    "http_reqs": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 1,
+        "rate": 43.58950887700348
+      }
+    },
+    "iterations": {
+      "type": "counter",
+      "contains": "default",
+      "values": {
+        "count": 1,
+        "rate": 43.58950887700348
+      }
+    },
+    "data_sent": {
+      "type": "counter",
+      "contains": "data",
+      "values": {
+        "count": 1343,
+        "rate": 58540.710421815675
+      }
+    },
+    "data_received": {
+      "type": "counter",
+      "contains": "data",
+      "values": {
+        "count": 2111,
+        "rate": 92017.45323935435
+      }
+    },
+    "iteration_duration": {
+      "contains": "time",
+      "values": {
+        "med": 22.9413,
+        "max": 22.9413,
+        "p(90)": 22.9413,
+        "p(95)": 22.9413,
+        "avg": 22.9413,
+        "min": 22.9413
+      },
+      "type": "trend"
+    },
+    "http_req_waiting": {
+      "type": "trend",
+      "contains": "time",
+      "values": {
+        "avg": 10.0262,
+        "min": 10.0262,
+        "med": 10.0262,
+        "max": 10.0262,
+        "p(90)": 10.0262,
+        "p(95)": 10.0262
+      }
+    }
+  },
+  "root_group": {
+    "name": "",
+    "path": "",
+    "id": "d41d8cd98f00b204e9800998ecf8427e",
+    "groups": [],
+    "checks": [
+      {
+        "name": "Google login returns 200",
+        "path": "::Google login returns 200",
+        "id": "5c5afabd5d84978d8ee5f5ba712d965f",
+        "passes": 1,
+        "fails": 0
+      },
+      {
+        "passes": 1,
+        "fails": 0,
+        "name": "Google login succeeds",
+        "path": "::Google login succeeds",
+        "id": "4483e5b7241e1e4dc72fedb7fc8e2563"
+      },
+      {
+        "fails": 0,
+        "name": "access token received",
+        "path": "::access token received",
+        "id": "ffa1356416d729a8a6453301e21af97c",
+        "passes": 1
+      },
+      {
+        "name": "Google user status returned",
+        "path": "::Google user status returned",
+        "id": "548dedd39bab46b41a21cd2d89469a88",
+        "passes": 1,
+        "fails": 0
+      },
+      {
+        "id": "e1f3ef67fe79b25e79b0a52593f1c733",
+        "passes": 1,
+        "fails": 0,
+        "name": "user email returned",
+        "path": "::user email returned"
+      },
+      {
+        "fails": 0,
+        "name": "refresh cookie received",
+        "path": "::refresh cookie received",
+        "id": "ffb32bc44528c9ea428e3194a4e42dbc",
+        "passes": 1
+      }
+    ]
+  },
+  "options": {
+    "summaryTrendStats": [
+      "avg",
+      "min",
+      "med",
+      "max",
+      "p(90)",
+      "p(95)"
+    ],
+    "summaryTimeUnit": "",
+    "noColor": false
+  },
+  "state": {
+    "isStdOutTTY": true,
+    "isStdErrTTY": true,
+    "testRunDurationMs": 22.9413
+  }
+}

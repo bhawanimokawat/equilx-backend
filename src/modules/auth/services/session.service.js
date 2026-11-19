@@ -10,6 +10,7 @@ const {
   getRefreshExpiry,
 } = require("./token.service");
 
+
 async function createAuthenticatedSession(user) {
   const refreshToken = createRefreshToken();
   const familyId = randomUUID();
@@ -29,9 +30,11 @@ async function createAuthenticatedSession(user) {
     id: user.id,
     email: user.email,
     platformRole: user.platformRole,
+    tokenVersion: user.tokenVersion,
     emailVerifiedAt: user.emailVerifiedAt,
     createdAt: user.createdAt,
     profile: user.profile || null,
+    memberships: user.memberships || [],
   };
 
   return {
