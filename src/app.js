@@ -33,6 +33,7 @@ const batchRoutes = require("./modules/batches/routes/batch.routes");
 const chatRoutes = require("./modules/chat/routes/chat.routes");
 const writingRoutes = require("./modules/writing/routes/writing.routes");
 const speakingRoutes = require("./modules/speaking/routes/speaking.routes");
+const aiAdminRoutes = require("./modules/admin/ai/routes/ai-admin.routes");
 
 const { apiLimiter } = require("./middleware/rate-limit.middleware");
 const {
@@ -117,7 +118,7 @@ app.use("/api/v1", batchRoutes);
 app.use("/api/v1", chatRoutes);
 app.use("/api/v1/writing", writingRoutes);
 app.use("/api/v1/speaking", speakingRoutes);
-
+app.use("/api/v1/admin/ai", aiAdminRoutes);
 
 
 // Error handling

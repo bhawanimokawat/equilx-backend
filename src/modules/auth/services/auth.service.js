@@ -233,6 +233,7 @@ async function refreshSession(rawRefreshToken) {
             memberships: {
               where: { status: "ACTIVE" },
               select: {
+                instituteId: true,
                 role: true,
                 status: true,
               },

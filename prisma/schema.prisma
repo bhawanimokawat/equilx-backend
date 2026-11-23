@@ -1093,8 +1093,26 @@ model AIModel {
 
   usageLogs AIUsageLog[]
 
+  routes AIModelRoute[]
+
   @@unique([provider, modelName, version])
   @@index([isActive, provider])
+}
+
+model AIModelRoute {
+  id        String  @id @default(uuid()) @db.Uuid
+  aiModelId String  @db.Uuid
+  purpose   String
+  priority  Int     @default(0)
+  isEnabled Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  aiModel AIModel @relation(fields: [aiModelId], references: [id], onDelete: Cascade)
+
+  @@unique([purpose, aiModelId])
+  @@index([purpose, isEnabled, priority])
 }
 
 model AIPromptVersion {
@@ -1826,4 +1844,34 @@ model RetentionHold {
   @@index([dataCategory, isActive])
   @@index([isActive, expiresAt])
   @@index([placedByUserId, placedAt])
+}
+
+model AISettings {
+  id String @id @default(uuid()) @db.Uuid
+
+  defaultProvider String @default("gemini")
+  defaultModel    String
+
+  writingModel       String
+  speakingModel      String
+  transcriptionModel String
+
+  temperature     Float @default(0.2)
+  maxOutputTokens Int   @default(4096)
+
+  dailyBudget   Decimal @default(0) @db.Decimal(12, 2)
+  monthlyBudget Decimal @default(0) @db.Decimal(12, 2)
+
+  freeDailyLimit      Int @default(20)
+  proDailyLimit       Int @default(100)
+  instituteDailyLimit Int @default(500)
+
+  alertsEnabled     Boolean @default(true)
+  evaluationEnabled Boolean @default(true)
+  loggingEnabled    Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("ai_settings")
 }

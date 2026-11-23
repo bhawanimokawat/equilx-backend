@@ -1,8 +1,14 @@
+
 const { z } = require("zod");
 
 const uuidSchema = z.string().uuid();
 
+const instituteParamsSchema = z.object({
+  instituteId: uuidSchema,
+});
+
 const createBatchSchema = z.object({
+  params: instituteParamsSchema,
   body: z.object({
     name: z.string().trim().min(2).max(150),
     trainerId: uuidSchema.nullable().optional(),
@@ -10,10 +16,9 @@ const createBatchSchema = z.object({
 });
 
 const updateBatchSchema = z.object({
-  params: z.object({
+  params: instituteParamsSchema.extend({
     batchId: uuidSchema,
-  }).strict(),
-
+  }),
   body: z.object({
     name: z.string().trim().min(2).max(150).optional(),
     trainerId: uuidSchema.nullable().optional(),
@@ -26,12 +31,13 @@ const updateBatchSchema = z.object({
 });
 
 const batchIdSchema = z.object({
-  params: z.object({
+  params: instituteParamsSchema.extend({
     batchId: uuidSchema,
-  }).strict(),
+  }),
 });
 
 const listBatchesSchema = z.object({
+  params: instituteParamsSchema,
   query: z.object({
     page: z.coerce.number().int().min(1).default(1),
     limit: z.coerce.number().int().min(1).max(100).default(20),
@@ -41,10 +47,9 @@ const listBatchesSchema = z.object({
 });
 
 const addBatchMembersSchema = z.object({
-  params: z.object({
+  params: instituteParamsSchema.extend({
     batchId: uuidSchema,
-  }).strict(),
-
+  }),
   body: z.object({
     userIds: z.array(uuidSchema).min(1).max(500),
   }).strict().refine(
@@ -54,17 +59,16 @@ const addBatchMembersSchema = z.object({
 });
 
 const removeBatchMemberSchema = z.object({
-  params: z.object({
+  params: instituteParamsSchema.extend({
     batchId: uuidSchema,
     userId: uuidSchema,
-  }).strict(),
+  }),
 });
 
 const listBatchMembersSchema = z.object({
-  params: z.object({
+  params: instituteParamsSchema.extend({
     batchId: uuidSchema,
-  }).strict(),
-
+  }),
   query: z.object({
     page: z.coerce.number().int().min(1).default(1),
     limit: z.coerce.number().int().min(1).max(100).default(20),
@@ -73,6 +77,7 @@ const listBatchMembersSchema = z.object({
 });
 
 const myBatchesSchema = z.object({
+  params: instituteParamsSchema,
   query: z.object({
     page: z.coerce.number().int().min(1).default(1),
     limit: z.coerce.number().int().min(1).max(100).default(20),

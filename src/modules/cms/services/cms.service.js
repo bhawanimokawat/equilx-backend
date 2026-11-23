@@ -216,6 +216,7 @@ async function archiveTest(testId) {
     },
   });
 }
+
 async function getTestVersionById(versionId) {
   return prisma.testVersion.findUnique({
     where: { id: versionId },
@@ -229,6 +230,44 @@ async function getTestVersionById(versionId) {
           bookId: true,
         },
       },
+      modules: {
+        orderBy: {
+          position: "asc",
+        },
+        include: {
+          parts: {
+            orderBy: {
+              position: "asc",
+            },
+            include: {
+              groups: {
+                orderBy: {
+                  position: "asc",
+                },
+                include: {
+                  questions: {
+                    orderBy: {
+                      position: "asc",
+                    },
+                    include: {
+                      answerKey: true,
+                    },
+                  },
+                },
+              },
+              questions: {
+                orderBy: {
+                  position: "asc",
+                },
+                include: {
+                  answerKey: true,
+                },
+              },
+            },
+          },
+        },
+      },
+      bandConversions: true,
     },
   });
 }

@@ -1,13 +1,72 @@
 const { Prisma } = require("@prisma/client");
-const { createBookSchema, updateBookSchema, bookIdParamSchema, listBooksQuerySchema, createTestSchema, listTestsQuerySchema,
-   updateTestSchema, testIdParamSchema, createTestVersionSchema, testVersionIdParamSchema, updateTestVersionSchema,createTestModuleSchema, moduleIdParamSchema ,createTestPartSchema,testPartIdParamSchema,updateTestPartSchema,createQuestionGroupSchema,
-   questionGroupIdParamSchema,updateQuestionGroupSchema,createQuestionSchema,questionIdParamSchema,updateQuestionSchema,createAnswerKeySchema,
-   getAnswerKeyById,updateAnswerKeySchema,createBandConversionSchema,bandConversionIdParamSchema,updateTestModuleSchema,bulkImportTestSchema} = require("../validation/cms.validation");
+const {
+  createBookSchema,
+  updateBookSchema,
+  bookIdParamSchema,
+  listBooksQuerySchema,
+  createTestSchema,
+  listTestsQuerySchema,
+  updateTestSchema,
+  testIdParamSchema,
+  createTestVersionSchema,
+  testVersionIdParamSchema,
+  updateTestVersionSchema,
+  createTestModuleSchema,
+  moduleIdParamSchema,
+  createTestPartSchema,
+  testPartIdParamSchema,
+  updateTestPartSchema,
+  createQuestionGroupSchema,
+  questionGroupIdParamSchema,
+  updateQuestionGroupSchema,
+  createQuestionSchema,
+  questionIdParamSchema,
+  updateQuestionSchema,
+  createAnswerKeySchema,
+  answerKeyIdParamSchema,
+  updateAnswerKeySchema,
+  createBandConversionSchema,
+  bandConversionIdParamSchema,
+  updateTestModuleSchema,
+  bulkImportTestSchema,
+} = require("../validation/cms.validation");
 
-const { createBook, listBooks, getBookById, updateBook, createTest, listTests, 
-  getTestById, updateTest, archiveTest, getTestVersionById, updateTestVersion,createTestModule,getTestModuleById,createTestPart ,
-  getTestPartById,updateTestPart,createQuestionGroup,getQuestionGroupById,updateQuestionGroup,createQuestion,getQuestionById,
-  updateQuestion,createAnswerKey,answerKeyIdParamSchema,updateAnswerKey,createBandConversion,getBandConversionById,updateTestModule,bulkImportTest,publishTestVersion} = require("../services/cms.service");
+
+
+const {
+  createBook,
+  listBooks,
+  getBookById,
+  updateBook,
+  createTest,
+  listTests,
+  createTestVersion,
+  getTestById,
+  updateTest,
+  archiveTest,
+  getTestVersionById,
+  updateTestVersion,
+  createTestModule,
+  getTestModuleById,
+  createTestPart,
+  getTestPartById,
+  updateTestPart,
+  createQuestionGroup,
+  getQuestionGroupById,
+  updateQuestionGroup,
+  createQuestion,
+  getQuestionById,
+  updateQuestion,
+  createAnswerKey,
+  getAnswerKeyById,
+  updateAnswerKey,
+  createBandConversion,
+  getBandConversionById,
+  updateTestModule,
+  bulkImportTest,
+  publishTestVersion,
+} = require("../services/cms.service");
+
 
 function sendError(res, status, code, message) {
   return res.status(status).json({
@@ -17,6 +76,7 @@ function sendError(res, status, code, message) {
 }
 
 function handleError(res, error, resource = "BOOK") {
+  console.error(`[CMS ${resource} ERROR]`, error);
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
     if (error.code === "P2002") {
       if (resource === "TEST") {

@@ -15,6 +15,10 @@ const {
   disconnectDatabase,
 } = require("./config/database");
 
+const {
+  initializeAIModelRegistry,
+} = require("./modules/ai/services/ai-model-registry.service");
+
 const { initializeSocket } = require("./config/socket");
 const { closeRedis } = require("./config/redis");
 
@@ -48,9 +52,11 @@ async function startServer() {
   try {
     await connectDatabase();
 
+    // Initialize configured AI models and their default routes.
+    await initializeAIModelRegistry();
+
     // Start the AI BullMQ worker.
     startAIWorker();
-
     // Run payment expiry check immediately.
     await runPaymentExpiry();
 
@@ -79,7 +85,7 @@ async function startServer() {
       paymentExpiryInterval = null;
     }
 
-    await closeAIWorker().catch(() => {});
+    await closeAIWorker().catch(() => { });
 
     if (io) {
       await new Promise((resolve) => io.close(resolve));
@@ -90,8 +96,8 @@ async function startServer() {
       server = null;
     }
 
-    await closeRedis().catch(() => {});
-    await disconnectDatabase().catch(() => {});
+    await closeRedis().catch(() => { });
+    await disconnectDatabase().catch(() => { });
 
     process.exitCode = 1;
   }

@@ -29,14 +29,44 @@ async function getClient() {
   return clientPromise;
 }
 
+// Validate model against the server-side catalog and requested purpose.
+function resolveModel(model, purpose, defaultModel) {
+  const selectedModel = model || defaultModel;
+
+  const configuredModel = aiConfig.gemini.modelCatalog.find(
+    (item) => item.modelName === selectedModel
+  );
+
+  if (!configuredModel) {
+    throw new Error(
+      `Gemini model "${selectedModel}" is not configured.`
+    );
+  }
+
+  if (!configuredModel.purposes.includes(purpose)) {
+    throw new Error(
+      `Gemini model "${selectedModel}" is not configured for ${purpose}.`
+    );
+  }
+
+  return selectedModel;
+}
+
 async function generateText({
   prompt,
   systemInstruction,
   generation = {},
+  model,
 }) {
   if (typeof prompt !== "string" || !prompt.trim()) {
     throw new Error("A valid AI prompt is required.");
   }
+
+  const selectedModel = resolveModel(
+    model,
+    "WRITING",
+    aiConfig.gemini.model
+  );
 
   const client = await getClient();
 
@@ -53,35 +83,35 @@ async function generateText({
   }
 
   const response = await client.models.generateContent({
-    model: aiConfig.gemini.model,
+    model: selectedModel,
     contents: prompt,
     config,
   });
 
- const text =
-  response.text ||
-  response.candidates
-    ?.flatMap((candidate) => candidate.content?.parts || [])
-    .map((part) => part.text)
-    .filter(Boolean)
-    .join("\n");
+  const text =
+    response.text ||
+    response.candidates
+      ?.flatMap((candidate) => candidate.content?.parts || [])
+      .map((part) => part.text)
+      .filter(Boolean)
+      .join("\n");
 
-if (!text || !text.trim()) {
-  console.error(
-    "[GEMINI EMPTY TEXT RESPONSE]",
-    JSON.stringify(response, null, 2)
-  );
+  if (!text || !text.trim()) {
+    console.error(
+      "[GEMINI EMPTY TEXT RESPONSE]",
+      JSON.stringify(response, null, 2)
+    );
 
-  throw new Error(
-    "Gemini returned no extractable text. Check the response diagnostics."
-  );
-}
+    throw new Error(
+      "Gemini returned no extractable text. Check the response diagnostics."
+    );
+  }
 
   const usage = response.usageMetadata || {};
 
   return {
     text: text.trim(),
-    model: aiConfig.gemini.model,
+    model: selectedModel,
     usage: {
       inputTokens: usage.promptTokenCount ?? 0,
       outputTokens: usage.candidatesTokenCount ?? 0,
@@ -90,10 +120,7 @@ if (!text || !text.trim()) {
   };
 }
 
-
-
-
-async function transcribeAudio({ filePath, mimeType }) {
+async function transcribeAudio({ filePath, mimeType, model }) {
   if (typeof filePath !== "string" || !filePath.trim()) {
     throw new Error("A valid audio file path is required.");
   }
@@ -101,6 +128,12 @@ async function transcribeAudio({ filePath, mimeType }) {
   if (typeof mimeType !== "string" || !mimeType.trim()) {
     throw new Error("A valid audio MIME type is required.");
   }
+
+  const selectedModel = resolveModel(
+    model,
+    "TRANSCRIPTION",
+    aiConfig.gemini.transcriptionModel
+  );
 
   const client = await getClient();
   let uploadedFile = null;
@@ -118,7 +151,7 @@ async function transcribeAudio({ filePath, mimeType }) {
     }
 
     const interaction = await client.interactions.create({
-      model: aiConfig.gemini.transcriptionModel,
+      model: selectedModel,
       input: [
         {
           type: "audio",
@@ -136,7 +169,7 @@ async function transcribeAudio({ filePath, mimeType }) {
 
     return {
       transcript: transcript.trim(),
-      model: aiConfig.gemini.transcriptionModel,
+      model: selectedModel,
       usage: interaction.usage || null,
     };
   } finally {
@@ -155,13 +188,12 @@ async function transcribeAudio({ filePath, mimeType }) {
   }
 }
 
-
-
 async function generateAudioEvaluation({
   prompt,
   systemInstruction,
   filePath,
   mimeType,
+  model,
 }) {
   if (typeof prompt !== "string" || !prompt.trim()) {
     throw new Error("A valid Speaking evaluation prompt is required.");
@@ -174,6 +206,12 @@ async function generateAudioEvaluation({
   if (typeof mimeType !== "string" || !mimeType.trim()) {
     throw new Error("A valid audio MIME type is required.");
   }
+
+  const selectedModel = resolveModel(
+    model,
+    "SPEAKING",
+    aiConfig.gemini.speakingModel
+  );
 
   const client = await getClient();
   let uploadedFile = null;
@@ -201,7 +239,7 @@ async function generateAudioEvaluation({
     logStage("Starting Speaking evaluation...");
 
     const result = await client.models.generateContent({
-      model: aiConfig.gemini.speakingModel,
+      model: selectedModel,
       contents: [
         {
           role: "user",
@@ -234,7 +272,7 @@ async function generateAudioEvaluation({
 
     return {
       text: responseText.trim(),
-      model: aiConfig.gemini.speakingModel,
+      model: selectedModel,
       usage: result.usageMetadata || null,
     };
   } catch (error) {
@@ -252,8 +290,6 @@ async function generateAudioEvaluation({
     }
   }
 }
-
-
 
 module.exports = {
   generateText,
