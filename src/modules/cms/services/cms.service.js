@@ -1294,15 +1294,18 @@ async function validateTestVersion(versionId) {
           });
         }
 
-        if (
-          objectivelyScoredTypes.has(question.questionType) &&
-          !question.answerKey
-        ) {
-          errors.push({
-            code: "MISSING_ANSWER_KEY",
-            message: `Question ${question.questionNumber} requires an answer key.`,
-          });
-        }
+       
+if (
+  ["LISTENING", "READING"].includes(module.section) &&
+  objectivelyScoredTypes.has(question.questionType) &&
+  !question.answerKey
+) {
+  errors.push({
+    code: "MISSING_ANSWER_KEY",
+    message: `Question ${question.questionNumber} requires an answer key.`,
+  });
+}
+
       }
     }
   }

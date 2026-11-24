@@ -4,11 +4,40 @@ const { createBookSchema, updateBookSchema, bookIdParamSchema, listBooksQuerySch
    questionGroupIdParamSchema,updateQuestionGroupSchema,createQuestionSchema,questionIdParamSchema,updateQuestionSchema,createAnswerKeySchema,
    getAnswerKeyById,updateAnswerKeySchema,createBandConversionSchema,bandConversionIdParamSchema,updateTestModuleSchema,bulkImportTestSchema} = require("../validation/cms.validation");
 
-const { createBook, listBooks, getBookById, updateBook, createTest, listTests, 
-  getTestById, updateTest, archiveTest, getTestVersionById, updateTestVersion,createTestModule,getTestModuleById,createTestPart ,
-  getTestPartById,updateTestPart,createQuestionGroup,getQuestionGroupById,updateQuestionGroup,createQuestion,getQuestionById,
-  updateQuestion,createAnswerKey,answerKeyIdParamSchema,updateAnswerKey,createBandConversion,getBandConversionById,updateTestModule,bulkImportTest,publishTestVersion} = require("../services/cms.service");
-
+const {
+  createBook,
+  listBooks,
+  getBookById,
+  updateBook,
+  createTest,
+  listTests,
+  getTestById,
+  updateTest,
+  archiveTest,
+  createTestVersion,
+  getTestVersionById,
+  updateTestVersion,
+  createTestModule,
+  getTestModuleById,
+  createTestPart,
+  getTestPartById,
+  updateTestPart,
+  createQuestionGroup,
+  getQuestionGroupById,
+  updateQuestionGroup,
+  createQuestion,
+  getQuestionById,
+  updateQuestion,
+  createAnswerKey,
+  answerKeyIdParamSchema,
+  updateAnswerKey,
+  createBandConversion,
+  getBandConversionById,
+  updateTestModule,
+  bulkImportTest,
+  publishTestVersion
+} = require("../services/cms.service");
+const cmsService = require("../services/cms.service");
 function sendError(res, status, code, message) {
   return res.status(status).json({
     success: false,
@@ -17,6 +46,13 @@ function sendError(res, status, code, message) {
 }
 
 function handleError(res, error, resource = "BOOK") {
+  console.error("========== CMS API ERROR ==========");
+console.error("Resource:", resource);
+console.error("Error Code:", error?.code);
+console.error("Error Message:", error?.message);
+console.error("Error Meta:", error?.meta);
+console.error("Error Stack:", error?.stack);
+console.error("===================================");
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
     if (error.code === "P2002") {
       if (resource === "TEST") {
