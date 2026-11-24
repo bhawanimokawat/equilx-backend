@@ -5,7 +5,11 @@ const IORedis = require("ioredis");
 const env = require("../../../config/env");
 const { prisma } = require("../../../config/database");
 const aiConfig = require("../config/ai.config");
-const aiProvider = require("../providers/ai.provider");
+const {
+  generateTextWithFallback,
+  transcribeAudioWithFallback,
+  generateAudioEvaluationWithFallback,
+} = require("../services/ai-fallback.service");
 
 const { buildWritingPrompt } = require("../prompts/writing.prompt");
 const {
@@ -30,9 +34,16 @@ const { createAIJob } = require("../services/ai-job.service");
 let worker = null;
 let connection = null;
 
-function createWorkerError(message, code = "AI_PROCESSING_FAILED") {
+
+function createWorkerError(
+  message,
+  code = "AI_PROCESSING_FAILED",
+  statusCode = 500
+) {
   const error = new Error(message);
   error.code = code;
+  error.statusCode = statusCode;
+
   return error;
 }
 
@@ -43,17 +54,17 @@ function getMaxAttempts(job, databaseJob) {
     !Number.isInteger(databaseMaxAttempts) ||
     databaseMaxAttempts < 1 ||
     databaseMaxAttempts > 5 ||
-    job.opts.attempts !== databaseMaxAttempts
+    job.opts?.attempts !== databaseMaxAttempts
   ) {
     throw createWorkerError(
       "Invalid or mismatched AI job retry configuration.",
-      500,
       "AI_RETRY_CONFIG_MISMATCH"
     );
   }
 
   return databaseMaxAttempts;
 }
+
 
 async function markJobProcessing(aiJobId, attemptNumber) {
   await prisma.aIJob.update({
@@ -312,11 +323,11 @@ async function processWritingEvaluation({
     wordCount: submission.wordCount,
   });
 
-  const result = await aiProvider.generateText({
-    prompt: promptData.prompt,
-    systemInstruction: promptData.systemInstruction,
-    generation: aiConfig.generation,
-  });
+  const result = await generateTextWithFallback({
+  prompt: promptData.prompt,
+  systemInstruction: promptData.systemInstruction,
+  generation: aiConfig.generation,
+});
 
   await saveWritingEvaluation({
     submissionId,
@@ -501,10 +512,10 @@ async function processTranscription({
     storageKey: recording.storageKey,
   });
 
-  const result = await aiProvider.transcribeAudio({
-    filePath,
-    mimeType: recording.mimeType,
-  });
+ const result = await transcribeAudioWithFallback({
+  filePath,
+  mimeType: recording.mimeType,
+});
 
   if (
     typeof result.transcript !== "string" ||
@@ -766,12 +777,12 @@ async function processSpeakingEvaluation({
   });
 
   // The actual recording is sent with the transcript prompt.
-  const result = await aiProvider.generateAudioEvaluation({
-    prompt: promptData.prompt,
-    systemInstruction: promptData.systemInstruction,
-    filePath,
-    mimeType: recording.mimeType,
-  });
+  const result = await generateAudioEvaluationWithFallback({
+  prompt: promptData.prompt,
+  systemInstruction: promptData.systemInstruction,
+  filePath,
+  mimeType: recording.mimeType,
+});
 
   // Verify consent again before persisting evaluation.
   await getSpeakingRecording({
@@ -805,13 +816,19 @@ async function processSpeakingEvaluation({
 // MAIN JOB DISPATCHER
 // --------------------------------------------------
 
-async function processAIJob(job) {
-  const { aiJobId } = job.data || {};
 
-  if (!aiJobId) {
-    throw createWorkerError("AI database job ID is missing.");
+async function processAIJob(job) {
+  const { aiJobId } = job?.data || {};
+
+  // 1. Validate BullMQ job ID
+  if (typeof aiJobId !== "string" || !aiJobId.trim()) {
+    throw createWorkerError(
+      "AI database job ID is missing.",
+      "AI_JOB_ID_MISSING"
+    );
   }
 
+  // 2. Fetch database job
   const aiJob = await prisma.aIJob.findUnique({
     where: {
       id: aiJobId,
@@ -828,37 +845,53 @@ async function processAIJob(job) {
   });
 
   if (!aiJob) {
-    throw createWorkerError("AI database job was not found.");
+    throw createWorkerError(
+      "AI database job was not found.",
+      "AI_JOB_NOT_FOUND"
+    );
   }
 
+  // 3. Idempotency: return an already completed result
   if (aiJob.status === "COMPLETED") {
     return aiJob.resultPayload;
   }
 
+  // 4. Validate job name
   if (job.name !== aiJob.jobType) {
     throw createWorkerError(
-      "BullMQ job name does not match the database job type."
+      "BullMQ job name does not match the database job type.",
+      "AI_JOB_TYPE_MISMATCH"
     );
   }
 
+  // 5. Validate input payload
   const payload = aiJob.inputPayload;
 
-  if (!payload || typeof payload !== "object") {
-    throw createWorkerError("AI job payload is invalid.");
+  if (
+    !payload ||
+    typeof payload !== "object" ||
+    Array.isArray(payload)
+  ) {
+    throw createWorkerError(
+      "AI job payload is invalid.",
+      "AI_JOB_PAYLOAD_INVALID"
+    );
   }
 
+  // 6. Validate retry configuration
   const maxAttempts = getMaxAttempts(job, aiJob);
-  const finalAttempt = job.attemptsMade + 1 >= maxAttempts;
 
+  const finalAttempt =
+    job.attemptsMade + 1 >= maxAttempts;
+
+  // 7. Identify evaluation type for failure handling
   let evaluationModel = null;
   let submissionId = null;
 
   if (aiJob.jobType === "WRITING_EVALUATION") {
     evaluationModel = "WRITING";
     submissionId = payload.submissionId;
-  }
-
-  if (aiJob.jobType === "SPEAKING_EVALUATION") {
+  } else if (aiJob.jobType === "SPEAKING_EVALUATION") {
     evaluationModel = "SPEAKING";
     submissionId = payload.submissionId;
   }
@@ -871,6 +904,7 @@ async function processAIJob(job) {
       aiJobId,
     };
 
+    // 8. Dispatch AI job
     switch (aiJob.jobType) {
       case "WRITING_EVALUATION":
         return await processWritingEvaluation(context);
@@ -883,10 +917,12 @@ async function processAIJob(job) {
 
       default:
         throw createWorkerError(
-          `No handler exists for AI job type: ${aiJob.jobType}`
+          `No handler exists for AI job type: ${aiJob.jobType}`,
+          "AI_JOB_TYPE_UNSUPPORTED"
         );
     }
   } catch (error) {
+    // 9. Update database failure state
     try {
       await markJobFailed({
         aiJobId,
@@ -902,9 +938,11 @@ async function processAIJob(job) {
       );
     }
 
+    // Preserve original error for BullMQ retry handling
     throw error;
   }
 }
+
 
 // --------------------------------------------------
 // WORKER LIFECYCLE

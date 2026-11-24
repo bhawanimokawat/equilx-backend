@@ -71,11 +71,6 @@ const supportChatRoutes = require("./modules/support-chat/routes/support-chat.ro
 
 const writingRoutes = require("./modules/writing/routes/writing.routes");
 const speakingRoutes = require("./modules/speaking/routes/speaking.routes");
-const materialRoutes = require("./modules/materials/routes/material.routes");
-
-// ========================================
-// MIDDLEWARE
-// ========================================
 
 const {
   apiLimiter,
@@ -278,7 +273,6 @@ app.use("/api/v1/writing", writingRoutes);
 
 app.use("/api/v1/speaking", speakingRoutes);
 
-app.use("/api/v1/materials", materialRoutes);
 
 // ========================================
 // 404 HANDLER
