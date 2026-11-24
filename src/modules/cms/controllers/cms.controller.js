@@ -58,12 +58,14 @@ const {
   getQuestionById,
   updateQuestion,
   createAnswerKey,
+  answerKeyIdParamSchema,
   getAnswerKeyById,
   updateAnswerKey,
   createBandConversion,
   getBandConversionById,
   updateTestModule,
   bulkImportTest,
+  validateTestVersion,
   publishTestVersion,
 } = require("../services/cms.service");
 
