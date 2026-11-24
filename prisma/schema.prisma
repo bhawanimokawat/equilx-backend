@@ -1849,3 +1849,117 @@ model RetentionHold {
   @@index([isActive, expiresAt])
   @@index([placedByUserId, placedAt])
 }
+
+enum StudyMaterialStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+model StudyMaterial {
+  id          String              @id @default(uuid()) @db.Uuid
+  title       String
+  description String?             @db.Text
+  content     String?             @db.Text
+  category    String
+  type        String
+  level       String?
+  imageUrl    String?
+  resourceUrl String?
+  duration    String?
+  featured    Boolean             @default(false)
+  status      StudyMaterialStatus @default(DRAFT)
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  publishedAt DateTime?
+
+  bookmarks StudyMaterialBookmark[]
+
+  @@index([status, createdAt])
+  @@index([category, status])
+  @@index([type, status])
+}
+
+model StudyMaterialBookmark {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String   @db.Uuid
+  materialId String   @db.Uuid
+  createdAt  DateTime @default(now())
+
+  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  material StudyMaterial @relation(fields: [materialId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, materialId])
+  @@index([userId, createdAt])
+}
+
+enum SupportConversationStatus {
+  OPEN
+  CLOSED
+}
+
+model SupportConversation {
+  id        String @id @default(uuid()) @db.Uuid
+  studentId String @db.Uuid
+
+  status  SupportConversationStatus @default(OPEN)
+  subject String?                   @db.VarChar(200)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  student  User             @relation("SupportStudent", fields: [studentId], references: [id], onDelete: Restrict)
+  messages SupportMessage[]
+
+  @@index([studentId, status])
+  @@index([status, updatedAt])
+}
+
+model SupportMessage {
+  id             String @id @default(uuid()) @db.Uuid
+  conversationId String @db.Uuid
+  senderId       String @db.Uuid
+
+  content String @db.Text
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  conversation SupportConversation @relation(fields: [conversationId], references: [id], onDelete: Restrict)
+  sender       User                @relation("SupportMessageSender", fields: [senderId], references: [id], onDelete: Restrict)
+
+  @@index([conversationId, createdAt, id])
+  @@index([senderId, createdAt])
+}
+
+model AISettings {
+  id String @id @default(uuid()) @db.Uuid
+
+  defaultProvider String @default("gemini")
+  defaultModel    String
+
+  writingModel       String
+  speakingModel      String
+  transcriptionModel String
+
+  temperature     Float @default(0.2)
+  maxOutputTokens Int   @default(4096)
+
+  dailyBudget   Decimal @default(0) @db.Decimal(12, 2)
+  monthlyBudget Decimal @default(0) @db.Decimal(12, 2)
+
+  freeDailyLimit      Int @default(20)
+  proDailyLimit       Int @default(100)
+  instituteDailyLimit Int @default(500)
+
+  alertsEnabled     Boolean @default(true)
+  evaluationEnabled Boolean @default(true)
+  loggingEnabled    Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("ai_settings")
+}
