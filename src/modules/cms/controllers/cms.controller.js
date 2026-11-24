@@ -64,6 +64,7 @@ const {
   getBandConversionById,
   updateTestModule,
   bulkImportTest,
+  validateTestVersion,
   publishTestVersion,
 } = require("../services/cms.service");
 
@@ -1441,9 +1442,7 @@ async function bulkImportTestHandler(req, res) {
 
 async function validateTestVersionHandler(req, res, next) {
   try {
-    const result = await cmsService.validateTestVersion(
-      req.params.versionId
-    );
+    const result = await validateTestVersion(req.params.versionId);
 
     return res.status(200).json({
       success: true,
@@ -1460,17 +1459,13 @@ async function validateTestVersionHandler(req, res, next) {
     return next(error);
   }
 }
-
 
 async function publishTestVersionHandler(req, res, next) {
   try {
-    const result = await cmsService.publishTestVersion(
-      req.params.versionId
-    );
+    const result = await publishTestVersion(req.params.versionId);
 
     return res.status(200).json({
       success: true,
-      message: "Test version published successfully.",
       data: result,
     });
   } catch (error) {
@@ -1481,18 +1476,9 @@ async function publishTestVersionHandler(req, res, next) {
       });
     }
 
-    if (error.code === "TEST_VERSION_VALIDATION_FAILED") {
-      return res.status(422).json({
-        success: false,
-        message: error.message,
-        errors: error.details,
-      });
-    }
-
     return next(error);
   }
 }
-
 module.exports = {
   createBookHandler,
   listBooksHandler,
