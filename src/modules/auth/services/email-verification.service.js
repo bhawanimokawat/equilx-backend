@@ -48,6 +48,8 @@ async function registerUser({ name, email, passwordHash, }) {
     });
 
     try {
+console.log("Registration email received:", email);
+console.log("User email saved in database:", user.email);
         await sendVerificationOtp(user.email, otp);
     } catch (error) {
         // Remove the pending account if the verification email cannot be sent.

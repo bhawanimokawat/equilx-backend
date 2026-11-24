@@ -64,7 +64,6 @@ const {
   getBandConversionById,
   updateTestModule,
   bulkImportTest,
-  validateTestVersion,
   publishTestVersion,
 } = require("../services/cms.service");
 
@@ -77,7 +76,6 @@ function sendError(res, status, code, message) {
 }
 
 function handleError(res, error, resource = "BOOK") {
-  console.error(`[CMS ${resource} ERROR]`, error);
   if (error instanceof Prisma.PrismaClientKnownRequestError) {
     if (error.code === "P2002") {
       if (resource === "TEST") {

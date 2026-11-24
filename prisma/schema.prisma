@@ -107,11 +107,15 @@ model User {
   batchMemberships BatchMember[]
   batchesAssigned  Batch[]       @relation("BatchTrainer")
 
-  trainerAssignments    TrainerStudent[] @relation("TrainerAssignmentTrainer")
-  studentAssignments    TrainerStudent[] @relation("TrainerAssignmentStudent")
-  assignmentsMade       TrainerStudent[] @relation("TrainerAssignmentCreator")
-  leadFollowUpsAssigned LeadFollowUp[]   @relation("LeadFollowUpAssignee")
-  leadFollowUpsCreated  LeadFollowUp[]   @relation("LeadFollowUpCreator")
+  trainerAssignments     TrainerStudent[]        @relation("TrainerAssignmentTrainer")
+  studentAssignments     TrainerStudent[]        @relation("TrainerAssignmentStudent")
+  assignmentsMade        TrainerStudent[]        @relation("TrainerAssignmentCreator")
+  leadFollowUpsAssigned  LeadFollowUp[]          @relation("LeadFollowUpAssignee")
+  leadFollowUpsCreated   LeadFollowUp[]          @relation("LeadFollowUpCreator")
+  studyMaterialBookmarks StudyMaterialBookmark[]
+
+  supportConversations SupportConversation[] @relation("SupportStudent")
+  supportMessagesSent  SupportMessage[]      @relation("SupportMessageSender")
 
   @@index([isActive, createdAt])
 }
@@ -1844,6 +1848,90 @@ model RetentionHold {
   @@index([dataCategory, isActive])
   @@index([isActive, expiresAt])
   @@index([placedByUserId, placedAt])
+}
+
+enum StudyMaterialStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+model StudyMaterial {
+  id          String              @id @default(uuid()) @db.Uuid
+  title       String
+  description String?             @db.Text
+  content     String?             @db.Text
+  category    String
+  type        String
+  level       String?
+  imageUrl    String?
+  resourceUrl String?
+  duration    String?
+  featured    Boolean             @default(false)
+  status      StudyMaterialStatus @default(DRAFT)
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  publishedAt DateTime?
+
+  bookmarks StudyMaterialBookmark[]
+
+  @@index([status, createdAt])
+  @@index([category, status])
+  @@index([type, status])
+}
+
+model StudyMaterialBookmark {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String   @db.Uuid
+  materialId String   @db.Uuid
+  createdAt  DateTime @default(now())
+
+  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  material StudyMaterial @relation(fields: [materialId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, materialId])
+  @@index([userId, createdAt])
+}
+
+enum SupportConversationStatus {
+  OPEN
+  CLOSED
+}
+
+model SupportConversation {
+  id        String @id @default(uuid()) @db.Uuid
+  studentId String @db.Uuid
+
+  status  SupportConversationStatus @default(OPEN)
+  subject String?                   @db.VarChar(200)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  student  User             @relation("SupportStudent", fields: [studentId], references: [id], onDelete: Restrict)
+  messages SupportMessage[]
+
+  @@index([studentId, status])
+  @@index([status, updatedAt])
+}
+
+model SupportMessage {
+  id             String @id @default(uuid()) @db.Uuid
+  conversationId String @db.Uuid
+  senderId       String @db.Uuid
+
+  content String @db.Text
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  conversation SupportConversation @relation(fields: [conversationId], references: [id], onDelete: Restrict)
+  sender       User                @relation("SupportMessageSender", fields: [senderId], references: [id], onDelete: Restrict)
+
+  @@index([conversationId, createdAt, id])
+  @@index([senderId, createdAt])
 }
 
 model AISettings {
